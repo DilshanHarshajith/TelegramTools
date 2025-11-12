@@ -1,11 +1,20 @@
 import os
 import csv
-from modules.utils.auth import connect_client
-from modules.utils.group_utils import read_groups_from_file
-from config import OUTPUT_DIR
+import asyncio
 from telethon.tl.types import User
+from telethon.errors import FloodWaitError
+from modules.utils.auth import connect_client
+from config import OUTPUT_DIR
+from tqdm.asyncio import tqdm_asyncio
+
+STOP = False  # For Ctrl+C handling
 
 def get_args(parser):
+    parser.add_argument(
+        "--groups",
+        nargs="*",
+        help="Telegram group links or a file containing groups"
+    )
     parser.add_argument(
         "--download-photos",
         action="store_true",
@@ -14,27 +23,38 @@ def get_args(parser):
     parser.add_argument(
         "--limit",
         type=int,
-        default=0,   # 0 = all messages
+        default=0,
         help="Maximum number of messages to scan per group (0 = all)"
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show usernames next to progress bar"
     )
 
 async def run(args):
+    global STOP
     client = await connect_client()
-    groups = args.groups or read_groups_from_file()
+    groups = args.groups
     module_output = os.path.join(OUTPUT_DIR, "user_export")
+    os.makedirs(module_output, exist_ok=True)
 
-    for group in groups:
-        await extract_visible_users(client, group, args.download_photos, args.limit, module_output)
+    try:
+        for group in groups:
+            await extract_all_users(client, group, args, module_output)
+    except KeyboardInterrupt:
+        STOP = True
+        print("\n[!] User interrupted, stopping...")
+    finally:
+        await client.disconnect()
 
-    await client.disconnect()
-
-async def extract_visible_users(client, group, download_photos=False, limit=0, module_output=None):
+async def extract_all_users(client, group, args, module_output):
     group_safe = group.replace('/', '_')
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
     csv_file_path = os.path.join(output_dir, "visible_users.csv")
 
-    # Load existing users to skip duplicates
+    # Load existing users
     existing_uids = set()
     if os.path.isfile(csv_file_path):
         with open(csv_file_path, "r", newline="", encoding="utf-8") as f:
@@ -48,39 +68,51 @@ async def extract_visible_users(client, group, download_photos=False, limit=0, m
     if not csv_exists:
         writer.writerow(["user_id", "username", "first_name", "last_name", "has_photo"])
 
-    new_users = 0
-    scanned = 0
+    print(f"[+] Processing group: {group}")
 
-    # Determine total messages to display progress
-    total_messages = limit or await client.get_messages_count(group)
-    async for msg in client.iter_messages(group, limit=limit or None):
+    new_users = []
+    scanned = 0
+    limit = args.limit or None
+
+    async for msg in tqdm_asyncio(client.iter_messages(group, limit=limit), desc="Scanning messages"):
+        if STOP:
+            break
         scanned += 1
         sender = msg.sender
         if not sender or not isinstance(sender, User):
             continue
         uid = str(sender.id)
         if uid in existing_uids:
-            continue  # Skip already-exported users
+            continue
+        new_users.append(sender)
+        existing_uids.add(uid)
+        if args.verbose:
+            tqdm_asyncio.write(f"{sender.first_name or ''} | {uid}")
 
-        # New user
-        has_photo = False
-        if download_photos and sender.photo:
-            filename = os.path.join(output_dir, f"{uid}.jpg")
-            if not os.path.isfile(filename):  # Skip if photo already exists
+    # Save CSV first
+    for sender in new_users:
+        writer.writerow([
+            str(sender.id),
+            sender.username or "",
+            sender.first_name or "",
+            sender.last_name or "",
+            ""  # photo to be downloaded later
+        ])
+    csv_file.close()
+    print(f"[✓] Collected {len(new_users)} new users from {group}")
+
+    # Download photos if requested
+    if args.download_photos and new_users:
+        print("[*] Downloading profile photos...")
+        from tqdm import tqdm
+        for sender in tqdm(new_users, desc="Downloading photos"):
+            filename = os.path.join(output_dir, f"{sender.id}.jpg")
+            if not os.path.isfile(filename) and sender.photo:
                 try:
                     await client.download_profile_photo(sender, file=filename)
-                    has_photo = True
+                except FloodWaitError as e:
+                    print(f"[!] Flood wait {e.seconds}s. Waiting...")
+                    await asyncio.sleep(e.seconds)
                 except:
                     pass
-            else:
-                has_photo = True  # Already exists
-
-        writer.writerow([uid, sender.username or "", sender.first_name or "", sender.last_name or "", has_photo])
-        existing_uids.add(uid)
-        new_users += 1
-
-        # Print live progress
-        print(f"\rScanning messages: {scanned}/{total_messages} | New users: {new_users}", end="")
-
-    csv_file.close()
-    print(f"\n[✓] Exported {new_users} new users from {group} to {output_dir}")
+        print(f"[✓] Export complete for {group} to {output_dir}")

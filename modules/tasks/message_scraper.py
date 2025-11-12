@@ -15,12 +15,27 @@ def get_args(parser):
         "-l", "--limit",
         type=int,
         default=0,
-        help="Message limit per group"
+        help="Message limit per group (0 = all messages)"
+    )
+    parser.add_argument(
+        "--groups",
+        nargs="*",
+        help="Groups to process (overrides groups.txt). Can be group links or a file containing links, one per line."
     )
 
 async def run(args):
     client = await connect_client()
-    groups = args.groups or read_groups_from_file()
+    
+    # Determine groups: CLI argument overrides default file
+    if args.groups:
+        # If a single argument is a file, read groups from it
+        if len(args.groups) == 1 and os.path.isfile(args.groups[0]):
+            groups = read_groups_from_file(args.groups[0])
+        else:
+            groups = args.groups
+    else:
+        groups = read_groups_from_file()
+    
     module_output = os.path.join(OUTPUT_DIR, "message_scraper")
 
     for group in groups:
@@ -35,11 +50,17 @@ async def scrape_group(client, group, keyword, limit, module_output):
 
     print(f"Scraping {group} for '{keyword}' (limit={limit})")
     messages = []
-    async for msg in client.iter_messages(group, limit=limit):
+
+    async for msg in client.iter_messages(group, limit=limit or None):
         if msg.message and keyword.lower() in msg.message.lower():
-            messages.append({"id": msg.id, "sender_id": msg.sender_id, "text": msg.message})
+            messages.append({
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "text": msg.message
+            })
 
     path = os.path.join(output_dir, f"{group_safe}.json")
     with open(path, "w") as f:
         json.dump(messages, f, indent=4)
+    
     print(f"[+] Saved {len(messages)} messages to {path}")

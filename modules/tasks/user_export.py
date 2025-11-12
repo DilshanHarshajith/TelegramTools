@@ -66,7 +66,7 @@ async def extract_all_users(client, group, args, module_output):
     csv_file = open(csv_file_path, "a", newline="", encoding="utf-8")
     writer = csv.writer(csv_file)
     if not csv_exists:
-        writer.writerow(["user_id", "username", "first_name", "last_name", "has_photo"])
+        writer.writerow(["user_id", "username", "first_name", "last_name"])
 
     print(f"[+] Processing group: {group}")
 
@@ -96,7 +96,6 @@ async def extract_all_users(client, group, args, module_output):
             sender.username or "",
             sender.first_name or "",
             sender.last_name or "",
-            ""  # photo to be downloaded later
         ])
     csv_file.close()
     print(f"[✓] Collected {len(new_users)} new users from {group}")
@@ -106,7 +105,7 @@ async def extract_all_users(client, group, args, module_output):
         print("[*] Downloading profile photos...")
         from tqdm import tqdm
         for sender in tqdm(new_users, desc="Downloading photos"):
-            filename = os.path.join(output_dir, f"{sender.id}.jpg")
+            filename = os.path.join(output_dir, f"{sender.username}_{sender.id}.jpg")
             if not os.path.isfile(filename) and sender.photo:
                 try:
                     await client.download_profile_photo(sender, file=filename)

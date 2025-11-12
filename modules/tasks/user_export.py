@@ -7,8 +7,6 @@ from modules.utils.auth import connect_client
 from config import OUTPUT_DIR
 from tqdm.asyncio import tqdm_asyncio
 
-STOP = False  # For Ctrl+C handling
-
 def get_args(parser):
     parser.add_argument(
         "--groups",
@@ -33,7 +31,6 @@ def get_args(parser):
     )
 
 async def run(args):
-    global STOP
     client = await connect_client()
     groups = args.groups
     module_output = os.path.join(OUTPUT_DIR, "user_export")
@@ -43,7 +40,6 @@ async def run(args):
         for group in groups:
             await extract_all_users(client, group, args, module_output)
     except KeyboardInterrupt:
-        STOP = True
         print("\n[!] User interrupted, stopping...")
     finally:
         await client.disconnect()
@@ -74,44 +70,47 @@ async def extract_all_users(client, group, args, module_output):
     scanned = 0
     limit = args.limit or None
 
-    async for msg in tqdm_asyncio(client.iter_messages(group, limit=limit), desc="Scanning messages"):
-        if STOP:
-            break
-        scanned += 1
-        sender = msg.sender
-        if not sender or not isinstance(sender, User):
-            continue
-        uid = str(sender.id)
-        if uid in existing_uids:
-            continue
-        new_users.append(sender)
-        existing_uids.add(uid)
-        if args.verbose:
-            tqdm_asyncio.write(f"{sender.first_name or ''} | {uid}")
+    try:
+        async for msg in tqdm_asyncio(client.iter_messages(group, limit=limit), desc="Scanning messages"):
+            scanned += 1
+            sender = msg.sender
+            if not sender or not isinstance(sender, User):
+                continue
+            uid = str(sender.id)
+            if uid in existing_uids:
+                continue
+            new_users.append(sender)
+            existing_uids.add(uid)
+            if args.verbose:
+                tqdm_asyncio.write(f"{sender.first_name or ''} | {uid}")
 
-    # Save CSV first
-    for sender in new_users:
-        writer.writerow([
-            str(sender.id),
-            sender.username or "",
-            sender.first_name or "",
-            sender.last_name or "",
-        ])
-    csv_file.close()
-    print(f"[✓] Collected {len(new_users)} new users from {group}")
+    except KeyboardInterrupt:
+        print("\n[!] Ctrl+C detected, stopping scanning...")
 
-    # Download photos if requested
-    if args.download_photos and new_users:
-        print("[*] Downloading profile photos...")
-        from tqdm import tqdm
-        for sender in tqdm(new_users, desc="Downloading photos"):
-            filename = os.path.join(output_dir, f"{sender.username}_{sender.id}.jpg")
-            if not os.path.isfile(filename) and sender.photo:
-                try:
-                    await client.download_profile_photo(sender, file=filename)
-                except FloodWaitError as e:
-                    print(f"[!] Flood wait {e.seconds}s. Waiting...")
-                    await asyncio.sleep(e.seconds)
-                except:
-                    pass
-        print(f"[✓] Export complete for {group} to {output_dir}")
+    finally:
+        # Save CSV
+        for sender in new_users:
+            writer.writerow([
+                str(sender.id),
+                sender.username or "",
+                sender.first_name or "",
+                sender.last_name or "",
+            ])
+        csv_file.close()
+        print(f"[✓] Saved {len(new_users)} users to {csv_file_path}")
+
+        # Download photos if requested
+        if args.download_photos and new_users:
+            print("[*] Downloading profile photos...")
+            from tqdm import tqdm
+            for sender in tqdm(new_users, desc="Downloading photos"):
+                filename = os.path.join(output_dir, f"{sender.username}_{sender.id}.jpg")
+                if not os.path.isfile(filename) and sender.photo:
+                    try:
+                        await client.download_profile_photo(sender, file=filename)
+                    except FloodWaitError as e:
+                        print(f"[!] Flood wait {e.seconds}s. Waiting...")
+                        await asyncio.sleep(e.seconds)
+                    except:
+                        pass
+            print(f"[✓] Profile photos downloaded to {output_dir}")

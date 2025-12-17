@@ -1,7 +1,7 @@
 import os
 import json
 from modules.utils.auth import connect_client
-from modules.utils.group_utils import read_groups_from_file
+from modules.utils.output import info, error, success
 from config import OUTPUT_DIR
 
 def get_args(parser):
@@ -26,41 +26,48 @@ def get_args(parser):
 async def run(args):
     client = await connect_client()
     
-    # Determine groups: CLI argument overrides default file
-    if args.groups:
-        # If a single argument is a file, read groups from it
-        if len(args.groups) == 1 and os.path.isfile(args.groups[0]):
-            groups = read_groups_from_file(args.groups[0])
-        else:
-            groups = args.groups
-    else:
-        groups = read_groups_from_file()
+    # Groups are already processed by main.py, use args.groups directly
+    groups = args.groups or []
+    if not groups:
+        error("No groups provided")
+        await client.disconnect()
+        return
     
     module_output = os.path.join(OUTPUT_DIR, "message_scraper")
 
-    for group in groups:
-        await scrape_group(client, group, args.keyword, args.limit, module_output)
-
-    await client.disconnect()
+    try:
+        for group in groups:
+            await scrape_group(client, group, args.keyword, args.limit, module_output)
+    finally:
+        try:
+            await client.disconnect()
+        except Exception as e:
+            error(f"Error disconnecting client: {e}")
 
 async def scrape_group(client, group, keyword, limit, module_output):
     group_safe = group.replace('/', '_')
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Scraping {group} for '{keyword}' (limit={limit})")
+    info(f"Scraping {group} for '{keyword}' (limit={limit or 'all'})")
     messages = []
 
-    async for msg in client.iter_messages(group, limit=limit or None):
-        if msg.message and keyword.lower() in msg.message.lower():
-            messages.append({
-                "id": msg.id,
-                "sender_id": msg.sender_id,
-                "text": msg.message
-            })
+    try:
+        async for msg in client.iter_messages(group, limit=limit or None):
+            if msg.message and keyword.lower() in msg.message.lower():
+                messages.append({
+                    "id": msg.id,
+                    "sender_id": msg.sender_id,
+                    "text": msg.message
+                })
+    except Exception as e:
+        error(f"Error scraping group {group}: {e}")
+        return
 
     path = os.path.join(output_dir, f"{group_safe}.json")
-    with open(path, "w") as f:
-        json.dump(messages, f, indent=4)
-    
-    print(f"[+] Saved {len(messages)} messages to {path}")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(messages, f, indent=4, ensure_ascii=False)
+        success(f"Saved {len(messages)} messages to {path}")
+    except Exception as e:
+        error(f"Error saving messages to {path}: {e}")

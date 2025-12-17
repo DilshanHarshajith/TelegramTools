@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import importlib
+import importlib.util
 import os
 import sys
 from modules.utils.group_utils import read_groups_from_file
@@ -34,7 +35,7 @@ async def run_module(module_name, modules, args):
 def parse_args(modules):
     # Step 1: parse known args to get module name
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-m", "--module", type=str, required=True, choices=list(modules.keys()))
+    parser.add_argument("-m", "--module", type=str, required=False, choices=list(modules.keys()))
     parser.add_argument("--list-modules", action="store_true")
     args, unknown = parser.parse_known_args()
 
@@ -43,6 +44,11 @@ def parse_args(modules):
         for m in modules:
             print("-", m)
         sys.exit(0)
+    
+    # Module is required if not listing modules
+    if not args.module:
+        error_parser = argparse.ArgumentParser()
+        error_parser.error("the following arguments are required: -m/--module")
 
     # Step 2: full parser for module-specific args
     parser = argparse.ArgumentParser(description=f"Run module '{args.module}'")
@@ -55,11 +61,14 @@ def parse_args(modules):
 
     # Ensure groups argument is a list
     if hasattr(final_args, "groups"):
-        if final_args.groups:
-            if len(final_args.groups) == 1 and os.path.isfile(final_args.groups[0]):
-                final_args.groups = read_groups_from_file(final_args.groups[0])
-        else:
+        # Check if groups is None or empty list/string
+        if not final_args.groups:
+            # No groups provided, read from default file
             final_args.groups = read_groups_from_file()
+        elif len(final_args.groups) == 1 and os.path.isfile(final_args.groups[0]):
+            # Single argument is a file path, read groups from it
+            final_args.groups = read_groups_from_file(final_args.groups[0])
+        # Otherwise, final_args.groups is already a list of group links
 
     return final_args
 

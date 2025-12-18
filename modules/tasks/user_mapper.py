@@ -138,21 +138,36 @@ async def _resolve_user(client, value: str):
 def _write_mappings_csv(csv_path: str, rows: List[Dict[str, str]]) -> None:
     """
     Append mappings to a CSV file, adding a header if the file does not yet exist.
+    Prevents duplicate records based on user_id.
     """
     file_exists = os.path.isfile(csv_path)
     os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
 
+    # Read existing user IDs to avoid duplicates
+    existing_user_ids: Set[str] = set()
+    if file_exists:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            if reader and reader.fieldnames:
+                for row in reader:
+                    if row.get("user_id"):
+                        existing_user_ids.add(row["user_id"])
+
+    # Write new records, skipping duplicates
     with open(csv_path, "a", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
         if not file_exists:
             writer.writerow(["input", "user_id", "username", "first_name", "last_name"])
 
         for row in rows:
-            writer.writerow([
-                row.get("input", ""),
-                row.get("user_id", ""),
-                row.get("username", ""),
-                row.get("first_name", ""),
-                row.get("last_name", ""),
-            ])
+            user_id = row.get("user_id", "")
+            if user_id and user_id not in existing_user_ids:
+                writer.writerow([
+                    row.get("input", ""),
+                    user_id,
+                    row.get("username", ""),
+                    row.get("first_name", ""),
+                    row.get("last_name", ""),
+                ])
+                existing_user_ids.add(user_id)
 

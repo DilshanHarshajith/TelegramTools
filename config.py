@@ -13,6 +13,7 @@ OUTPUT_DIR = os.path.join(DATA_DIR, "output")
 
 DEFAULT_KEYWORD = ""
 DEFAULT_LIMIT = 1000
+REPLY_ITER_LIMIT = 500
 
 # Validate required API credentials
 if not API_ID or not API_HASH:

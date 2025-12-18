@@ -58,7 +58,7 @@ async def run(args):
         }
         mappings.append(mapping)
 
-        username_display = f"@{mapping['username']}" if mapping["username"] else "<no_username>"
+        username_display = f"@{mapping['username'] if mapping['username'] else '<no_username>'}  | {mapping['first_name']} {mapping['last_name']}"
         success(f"{raw_value} -> id: {mapping['user_id']} | username: {username_display}")
 
     await client.disconnect()

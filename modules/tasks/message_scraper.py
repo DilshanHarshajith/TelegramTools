@@ -2,7 +2,7 @@ import os
 import json
 from modules.utils.auth import connect_client
 from modules.utils.output import info, error, success, warning, progress
-from config import OUTPUT_DIR
+from config import OUTPUT_DIR, REPLY_ITER_LIMIT
 
 def get_args(parser):
     parser.add_argument(
@@ -116,7 +116,7 @@ async def scrape_group(
                 if not matches_user:
                     continue
 
-            if msg.message and keyword.lower() in msg.message.lower() or keyword == "":
+            if msg.message and (keyword.lower() in msg.message.lower() or keyword == ""):
                 matched += 1
                 entry = {
                     "id": msg.id,
@@ -129,7 +129,7 @@ async def scrape_group(
                     # 1) Messages that reply TO this message (children)
                     replies_data = []
                     try:
-                        async for r in client.iter_messages(group, limit=300):
+                        async for r in client.iter_messages(group, limit=REPLY_ITER_LIMIT if REPLY_ITER_LIMIT else 300):
                             if getattr(r, "reply_to_msg_id", None) == msg.id:
                                 replies_data.append(
                                     {

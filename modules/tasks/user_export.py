@@ -5,7 +5,7 @@ from modules.utils.auth import connect_client
 from modules.utils.output import info, error, warning, success, progress
 from modules.utils.csv_utils import read_existing_user_ids, write_user_to_csv, parse_user_ids_from_csv
 from modules.utils.photo_utils import download_photos_batch, format_download_stats
-from modules.utils.user_utils import parse_user_ids_string, fetch_full_user
+from modules.utils.user_utils import parse_user_inputs, fetch_full_user, resolve_user_from_string
 from config import OUTPUT_DIR
 from tqdm.asyncio import tqdm_asyncio
 from tqdm import tqdm
@@ -93,7 +93,7 @@ async def handle_users_mode(client, users_arg, args, module_output):
             
     else:
         # Case 2: Inline string
-        user_ids = parse_user_ids_string(users_arg)
+        user_ids = parse_user_inputs(users_arg)
         output_dir = os.path.join(module_output, "manual_users")
 
     if not user_ids:
@@ -217,21 +217,21 @@ async def process_photo_downloads(client, users_or_ids, output_dir, args):
         # Need to fetch entities first
         progress(f"Fetching entities for {len(users_or_ids)} users...")
         fetch_failed = 0
-        for user_id in tqdm(users_or_ids, desc="Fetching entities"):
+        for user_input in tqdm(users_or_ids, desc="Fetching entities"):
             try:
-                user = await client.get_entity(int(user_id))
-                if isinstance(user, User):
+                # Use robust resolver instead of direct get_entity(int())
+                user = await resolve_user_from_string(client, str(user_input))
+                if user:
                     users_to_download.append(user)
                 else:
-                    if args.verbose:
-                        error(f"Skipping non-User entity: {user_id}")
+                    fetch_failed += 1
             except Exception as e:
                 if args.verbose:
-                    error(f"Failed to fetch user {user_id}: {e}")
+                    error(f"Failed to fetch user {user_input}: {e}")
                 fetch_failed += 1
                 
         if fetch_failed > 0:
-            warning(f"Failed to fetch {fetch_failed} users")
+            warning(f"Failed to resolve {fetch_failed} inputs")
     else:
         # Already User objects
         users_to_download = users_or_ids

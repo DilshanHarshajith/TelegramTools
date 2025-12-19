@@ -6,7 +6,8 @@ from telethon.tl.types import User
 
 from modules.utils.auth import connect_client
 from modules.utils.output import info, success, warning, error
-from modules.utils.user_utils import resolve_user_from_string
+from modules.utils.user_utils import resolve_user_from_string, parse_user_inputs
+from modules.utils.photo_utils import download_photos_batch, format_download_stats
 from config import OUTPUT_DIR
 
 
@@ -29,6 +30,11 @@ def get_args(parser):
         type=str,
         help="Optional CSV path for saving mappings (default: data/output/user_mapper/mappings.csv)",
     )
+    parser.add_argument(
+        "--photo",
+        action="store_true",
+        help="Optional flag to download user photos (default: False)",
+    )
 
 
 async def run(args):
@@ -43,12 +49,15 @@ async def run(args):
     output_csv = args.output or os.path.join(module_output, "mappings.csv")
 
     mappings: List[Dict[str, str]] = []
+    resolved_users: List[User] = []
 
     for raw_value in values:
         # Use shared utility to resolve user
         user = await resolve_user_from_string(client, raw_value)
         if not user:
             continue
+        
+        resolved_users.append(user)
 
         mapping = {
             "input": raw_value,
@@ -62,13 +71,14 @@ async def run(args):
         username_display = f"@{mapping['username'] if mapping['username'] else '<no_username>'}  | {mapping['first_name']} {mapping['last_name']}"
         success(f"{raw_value} -> id: {mapping['user_id']} | username: {username_display}")
 
-    await client.disconnect()
-
-    if not mappings:
-        warning("No valid mappings were created.")
-        return
-
     _write_mappings_csv(output_csv, mappings)
+    
+    if args.photo and resolved_users:
+        info("Downloading profile photos...")
+        stats = await download_photos_batch(client, resolved_users, module_output, verbose=True)
+        success(format_download_stats(*stats))
+
+    await client.disconnect()
     success(f"Saved {len(mappings)} mapping(s) to {output_csv}")
 
 
@@ -79,26 +89,23 @@ def _collect_inputs(cli_values: Iterable[str], file_path: str) -> List[str]:
     collected: List[str] = []
     seen: Set[str] = set()
 
-    def _add(value: str):
-        normalized = value.strip()
-        if not normalized:
-            return
-        if normalized in seen:
-            return
-        seen.add(normalized)
-        collected.append(normalized)
+    def _add_many(values: Iterable[str]):
+        for val in values:
+            parsed = parse_user_inputs(val)
+            for item in parsed:
+                if item not in seen:
+                    seen.add(item)
+                    collected.append(item)
 
     if cli_values:
-        for val in cli_values:
-            _add(val)
+        _add_many(cli_values)
 
     if file_path:
         if not os.path.isfile(file_path):
             error(f"File not found: {file_path}")
         else:
             with open(file_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    _add(line)
+                _add_many(f)
 
     return collected
 

@@ -2,11 +2,11 @@ import os
 import csv
 from typing import Iterable, List, Dict, Set
 
-from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError, PeerIdInvalidError
 from telethon.tl.types import User
 
 from modules.utils.auth import connect_client
 from modules.utils.output import info, success, warning, error
+from modules.utils.user_utils import resolve_user_from_string
 from config import OUTPUT_DIR
 
 
@@ -45,7 +45,8 @@ async def run(args):
     mappings: List[Dict[str, str]] = []
 
     for raw_value in values:
-        user = await _resolve_user(client, raw_value)
+        # Use shared utility to resolve user
+        user = await resolve_user_from_string(client, raw_value)
         if not user:
             continue
 
@@ -100,39 +101,6 @@ def _collect_inputs(cli_values: Iterable[str], file_path: str) -> List[str]:
                     _add(line)
 
     return collected
-
-
-async def _resolve_user(client, value: str):
-    """
-    Resolve a username or user ID to a Telethon User entity.
-    """
-    cleaned = value.strip()
-    if cleaned.startswith("@"):
-        cleaned = cleaned[1:]
-
-    try:
-        entity = await client.get_entity(int(cleaned)) if cleaned.isdigit() else await client.get_entity(cleaned)
-    except UsernameNotOccupiedError:
-        error(f"Username not found: {value}")
-        return None
-    except UsernameInvalidError:
-        error(f"Invalid username: {value}")
-        return None
-    except PeerIdInvalidError:
-        error(f"Invalid user ID: {value}")
-        return None
-    except ValueError:
-        error(f"Could not resolve: {value}")
-        return None
-    except Exception as exc:  # Fallback for unexpected errors
-        error(f"Failed to resolve {value}: {exc}")
-        return None
-
-    if not isinstance(entity, User):
-        warning(f"Resolved entity is not a user: {value} ({type(entity).__name__})")
-        return None
-
-    return entity
 
 
 def _write_mappings_csv(csv_path: str, rows: List[Dict[str, str]]) -> None:

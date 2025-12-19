@@ -92,29 +92,8 @@ async def scrape_group(
         async for msg in client.iter_messages(group, limit=limit or None):
             scanned += 1
 
-            # If a user filter is provided, skip messages not from that user
-            if user_filter:
-                from_id = getattr(msg, "sender_id", None)
-                matches_user = False
-
-                # Numeric ID filter
-                if user_filter.isdigit() and from_id is not None:
-                    if str(from_id) == user_filter:
-                        matches_user = True
-                else:
-                    # Username filter (e.g. "user" or "@user")
-                    username_target = user_filter.lstrip("@").lower()
-                    try:
-                        sender = await msg.get_sender()
-                    except Exception:
-                        sender = None
-                    if sender is not None:
-                        uname = getattr(sender, "username", None)
-                        if uname and uname.lower() == username_target:
-                            matches_user = True
-
-                if not matches_user:
-                    continue
+            if not await should_include_message(msg, user_filter):
+                continue
 
             if msg.message and (keyword.lower() in msg.message.lower() or keyword == ""):
                 matched += 1
@@ -124,57 +103,20 @@ async def scrape_group(
                     "text": msg.message,
                 }
 
-                # Optionally collect replies for this matching message
                 if include_replies:
-                    # 1) Messages that reply TO this message (children)
-                    replies_data = []
-                    try:
-                        async for r in client.iter_messages(group, limit=REPLY_ITER_LIMIT if REPLY_ITER_LIMIT else 300):
-                            if getattr(r, "reply_to_msg_id", None) == msg.id:
-                                replies_data.append(
-                                    {
-                                        "id": r.id,
-                                        "sender_id": r.sender_id,
-                                        "text": r.message,
-                                    }
-                                )
-                    except Exception:
-                        # Silently ignore reply collection errors, keep main result intact
-                        pass
-
-                    if replies_data:
-                        entry["replies"] = replies_data
-
-                    # 2) If this message itself is a reply to another message (parent)
-                    parent_id = getattr(msg, "reply_to_msg_id", None)
-                    if not parent_id and getattr(msg, "reply_to", None):
-                        parent_id = getattr(msg.reply_to, "reply_to_msg_id", None)
-
-                    if parent_id:
-                        try:
-                            parent = await client.get_messages(group, ids=parent_id)
-                            if parent:
-                                entry["reply_to"] = {
-                                    "id": parent.id,
-                                    "sender_id": parent.sender_id,
-                                    "text": parent.message,
-                                }
-                        except Exception:
-                            # If parent fetch fails, just skip it
-                            pass
+                    replies_ctx = await collect_replies(client, group, msg)
+                    entry.update(replies_ctx)
 
                 messages.append(entry)
 
                 if verbose:
-                    # Show sender_id and a short snippet of the text (first 80 chars)
                     snippet = msg.message.replace("\n", " ")[:80]
                     info(f"{group} | sender_id={msg.sender_id} | \"{snippet}\"")
 
-                # Show progress for matches every 10 messages found
                 if matched % 10 == 0:
                     progress(f"{group}: found {matched} matching messages after scanning {scanned}")
 
-            # Periodic scan-only progress: update a single line in-place to avoid scroll spam
+            # Periodic scan-only progress
             if scanned % 200 == 0:
                 print(
                     f"[*] {group}: scanned {scanned} messages, matches so far: {matched}",
@@ -184,13 +126,11 @@ async def scrape_group(
 
     except KeyboardInterrupt:
         warning("\nCtrl+C detected, saving current progress for this group before exiting...")
-        # Re-raise so the caller (and main) can stop processing further groups
         raise
     except Exception as e:
         error(f"Error scraping group {group}: {e}")
         return
     finally:
-        # Ensure we end any in-place progress line with a newline before final messages
         print()
         path = os.path.join(output_dir, f"{group_safe}.json")
         try:
@@ -199,3 +139,73 @@ async def scrape_group(
             success(f"Saved {len(messages)} messages (scanned {scanned}) to {path}")
         except Exception as e:
             error(f"Error saving messages to {path}: {e}")
+
+async def should_include_message(msg, user_filter: str | None) -> bool:
+    """
+    Check if a message matches the user filter (if any).
+    """
+    if not user_filter:
+        return True
+
+    from_id = getattr(msg, "sender_id", None)
+    
+    # Numeric ID check
+    if user_filter.isdigit() and from_id is not None:
+        return str(from_id) == user_filter
+
+    # Username check
+    username_target = user_filter.lstrip("@").lower()
+    try:
+        sender = await msg.get_sender()
+    except Exception:
+        sender = None
+
+    if sender is not None:
+        uname = getattr(sender, "username", None)
+        if uname and uname.lower() == username_target:
+            return True
+    
+    return False
+
+async def collect_replies(client, group, msg) -> dict:
+    """
+    Collect replies (children) and parent message for a given message.
+    """
+    result = {}
+    
+    # 1) Messages that reply TO this message (children)
+    replies_data = []
+    try:
+        async for r in client.iter_messages(group, limit=REPLY_ITER_LIMIT if REPLY_ITER_LIMIT else 300):
+            if getattr(r, "reply_to_msg_id", None) == msg.id:
+                replies_data.append(
+                    {
+                        "id": r.id,
+                        "sender_id": r.sender_id,
+                        "text": r.message,
+                    }
+                )
+    except Exception:
+        pass
+
+    if replies_data:
+        result["replies"] = replies_data
+
+    # 2) If this message itself is a reply to another message (parent)
+    parent_id = getattr(msg, "reply_to_msg_id", None)
+    if not parent_id and getattr(msg, "reply_to", None):
+        parent_id = getattr(msg.reply_to, "reply_to_msg_id", None)
+
+    if parent_id:
+        try:
+            parent = await client.get_messages(group, ids=parent_id)
+            if parent:
+                result["reply_to"] = {
+                    "id": parent.id,
+                    "sender_id": parent.sender_id,
+                    "text": parent.message,
+                }
+        except Exception:
+            pass
+            
+    return result

@@ -102,3 +102,18 @@ async def download_photos_batch(client, users: list, output_dir: str, verbose: b
     
     return successful, skipped, no_photo, failed
 
+def format_download_stats(successful: int, skipped: int, no_photo: int, failed: int) -> str:
+    """
+    Format download statistics into a readable string.
+    """
+    parts = [f"{successful} downloaded"]
+    
+    if skipped > 0:
+        parts.append(f"{skipped} skipped (already exist)")
+    if no_photo > 0:
+        parts.append(f"{no_photo} no photo")
+    if failed > 0:
+        parts.append(f"{failed} failed")
+        
+    return ", ".join(parts)
+

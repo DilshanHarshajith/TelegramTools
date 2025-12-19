@@ -7,32 +7,35 @@ from telethon.tl.types import User, PeerUser
 from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError, PeerIdInvalidError
 from modules.utils.output import error, warning
 
-def parse_user_ids_string(input_str: Optional[str]) -> List[str]:
+def parse_user_inputs(input_str: Optional[str]) -> List[str]:
     """
-    Parse a string of user IDs (comma or whitespace separated).
-    Returns a list of unique user IDs as strings.
+    Parse a string containing multiple usernames or IDs.
+    Handles mixed delimiters like commas, spaces, or both.
+    Example: "@user1, user2 123456" -> ["@user1", "user2", "123456"]
     """
     if not input_str:
         return []
-
-    raw_parts = []
-    if ',' in input_str:
-        raw_parts = input_str.split(',')
-    else:
-        raw_parts = input_str.split()
-
-    # Filter digits and strip whitespace
-    user_ids = [part.strip() for part in raw_parts if part.strip().isdigit()]
-
-    # Deduplicate while preserving order
+    
+    # Replace commas with spaces to unify delimiters, then split by whitespace
+    raw_parts = input_str.replace(',', ' ').split()
+    
+    collected = []
     seen = set()
-    unique_ids = []
-    for uid in user_ids:
-        if uid not in seen:
-            seen.add(uid)
-            unique_ids.append(uid)
-            
-    return unique_ids
+    for part in raw_parts:
+        normalized = part.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            collected.append(normalized)
+    return collected
+
+
+def parse_user_ids_string(input_str: Optional[str]) -> List[str]:
+    """
+    Parse a string of user IDs (comma or whitespace separated).
+    Returns a list of unique user IDs as strings (digits only).
+    """
+    inputs = parse_user_inputs(input_str)
+    return [i for i in inputs if i.isdigit()]
 
 
 async def resolve_user_from_string(client, value: str) -> Optional[User]:

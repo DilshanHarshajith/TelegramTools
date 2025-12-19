@@ -228,7 +228,7 @@ async def download_photos_from_csv(client, csv_path, args, module_output):
     # If CSV is in a subdirectory, use that subdirectory name
     csv_dir = os.path.dirname(csv_path)
     if csv_dir and csv_dir != module_output:
-        # Extract the group name from the path (e.g., "https:__t.me_ajanthasir2027livechat")
+        # Extract the group name from the path
         group_dir_name = os.path.basename(csv_dir)
         output_dir = os.path.join(module_output, group_dir_name)
     else:

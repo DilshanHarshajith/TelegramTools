@@ -211,45 +211,22 @@ async def extract_all_users(client, group, args, module_output):
             success(f"{result_msg} - saved to {output_dir}")
 
 
-async def download_photos_from_csv(client, csv_path, args, module_output):
+async def process_user_photos_list(client, user_ids, output_dir, args):
     """
-    Download profile photos for users specified in a CSV file.
+    Shared logic to fetch user entities from IDs and download their photos.
     """
-    info(f"Reading user IDs from CSV: {csv_path}")
-    user_ids = parse_user_ids_from_csv(csv_path)
-    
-    if not user_ids:
-        error("No valid user IDs found in CSV file")
-        return
-    
-    info(f"Found {len(user_ids)} user IDs in CSV")
-    
-    # Create output directory based on CSV's parent directory (group name)
-    # If CSV is in a subdirectory, use that subdirectory name
-    csv_dir = os.path.dirname(csv_path)
-    if csv_dir and csv_dir != module_output:
-        # Extract the group name from the path
-        group_dir_name = os.path.basename(csv_dir)
-        output_dir = os.path.join(module_output, group_dir_name)
-    else:
-        # Fallback: use CSV filename without extension
-        csv_basename = os.path.splitext(os.path.basename(csv_path))[0]
-        output_dir = os.path.join(module_output, csv_basename)
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
     if not args.download_photos:
         warning("--no-photos set, skipping photo download")
         return
-    
+
     progress("Fetching user entities and downloading photos...")
-    
+
     successful = 0
     skipped = 0
     no_photo = 0
     failed = 0
     fetch_failed = 0
-    
+
     for user_id in tqdm(user_ids, desc="Processing users"):
         try:
             # Fetch user entity
@@ -259,7 +236,7 @@ async def download_photos_from_csv(client, csv_path, args, module_output):
                     error(f"Skipping non-User entity: {user_id} ({type(user).__name__})")
                 failed += 1
                 continue
-            
+
             # Download photo using utility function
             success_flag, status = await download_user_photo(client, user, output_dir, user_id=user_id, verbose=args.verbose)
             if success_flag:
@@ -274,7 +251,7 @@ async def download_photos_from_csv(client, csv_path, args, module_output):
             if args.verbose:
                 error(f"Failed to fetch user {user_id}: {e}")
             fetch_failed += 1
-    
+
     result_msg = f"Download complete: {successful} downloaded"
     if skipped > 0:
         result_msg += f", {skipped} skipped (already exist)"
@@ -286,6 +263,36 @@ async def download_photos_from_csv(client, csv_path, args, module_output):
         result_msg += f", {fetch_failed} fetch errors"
     success(result_msg)
     success(f"Photos saved to: {output_dir}")
+
+
+async def download_photos_from_csv(client, csv_path, args, module_output):
+    """
+    Download profile photos for users specified in a CSV file.
+    """
+    info(f"Reading user IDs from CSV: {csv_path}")
+    user_ids = parse_user_ids_from_csv(csv_path)
+
+    if not user_ids:
+        error("No valid user IDs found in CSV file")
+        return
+
+    info(f"Found {len(user_ids)} user IDs in CSV")
+
+    # Create output directory based on CSV's parent directory (group name)
+    # If CSV is in a subdirectory, use that subdirectory name
+    csv_dir = os.path.dirname(csv_path)
+    if csv_dir and csv_dir != module_output:
+        # Extract the group name from the path
+        group_dir_name = os.path.basename(csv_dir)
+        output_dir = os.path.join(module_output, group_dir_name)
+    else:
+        # Fallback: use CSV filename without extension
+        csv_basename = os.path.splitext(os.path.basename(csv_path))[0]
+        output_dir = os.path.join(module_output, csv_basename)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    await process_user_photos_list(client, user_ids, output_dir, args)
 
 
 async def download_photos_from_inline(client, user_ids, args, module_output):
@@ -302,51 +309,4 @@ async def download_photos_from_inline(client, user_ids, args, module_output):
     output_dir = os.path.join(module_output, "manual_users")
     os.makedirs(output_dir, exist_ok=True)
 
-    if not args.download_photos:
-        warning("--no-photos set, skipping photo download")
-        return
-
-    progress("Fetching user entities and downloading photos...")
-
-    successful = 0
-    skipped = 0
-    no_photo = 0
-    failed = 0
-    fetch_failed = 0
-
-    for user_id in tqdm(user_ids, desc="Processing users"):
-        try:
-            user = await client.get_entity(int(user_id))
-            if not isinstance(user, User):
-                if args.verbose:
-                    error(f"Skipping non-User entity: {user_id} ({type(user).__name__})")
-                failed += 1
-                continue
-
-            success_flag, status = await download_user_photo(
-                client, user, output_dir, user_id=user_id, verbose=args.verbose
-            )
-            if success_flag:
-                successful += 1
-            elif status == "skipped_exists":
-                skipped += 1
-            elif status == "no_photo":
-                no_photo += 1
-            else:
-                failed += 1
-        except Exception as e:
-            if args.verbose:
-                error(f"Failed to fetch user {user_id}: {e}")
-            fetch_failed += 1
-
-    result_msg = f"Download complete: {successful} downloaded"
-    if skipped > 0:
-        result_msg += f", {skipped} skipped (already exist)"
-    if no_photo > 0:
-        result_msg += f", {no_photo} no photo"
-    if failed > 0:
-        result_msg += f", {failed} failed"
-    if fetch_failed > 0:
-        result_msg += f", {fetch_failed} fetch errors"
-    success(result_msg)
-    success(f"Photos saved to: {output_dir}")
+    await process_user_photos_list(client, user_ids, output_dir, args)

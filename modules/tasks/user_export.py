@@ -46,8 +46,7 @@ async def run(args):
     try:
         # If --users is provided, skip message scanning and just download photos
         if args.users:
-            if not args.download_photos:
-                warning("--users provided but --no-photos set. Photos will not be downloaded.")
+            args.download_photos = True
 
             # If the argument points to an existing file, treat it as txt/csv
             if os.path.isfile(args.users):

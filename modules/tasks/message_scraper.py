@@ -9,7 +9,6 @@ def get_args(parser):
         "-k", "--keyword",
         type=str,
         default="",
-        required=True,
         help="Keyword to search messages"
     )
     parser.add_argument(
@@ -46,6 +45,11 @@ async def run(args):
     groups = args.groups or []
     if not groups:
         error("No groups provided")
+        await client.disconnect()
+        return
+
+    if not (args.user or args.keyword):
+        error("At least one of --user or --keyword must be provided")
         await client.disconnect()
         return
     

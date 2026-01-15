@@ -1,4 +1,12 @@
 import os
+import sys
+
+# Add project root to sys.path if running as standalone script
+if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
 import csv
 from typing import Iterable, List, Dict, Set
 
@@ -145,4 +153,18 @@ def _write_mappings_csv(csv_path: str, rows: List[Dict[str, str]]) -> None:
                     row.get("last_name", ""),
                 ])
                 existing_user_ids.add(user_id)
+
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+
+    parser = argparse.ArgumentParser(description="Telegram User Mapper")
+    get_args(parser)
+    args = parser.parse_args()
+
+    try:
+        asyncio.run(run(args))
+    except KeyboardInterrupt:
+        pass
 

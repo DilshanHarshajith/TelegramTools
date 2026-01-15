@@ -13,6 +13,13 @@ Instructions:
 """
 
 import os
+import sys
+
+# Add project root to sys.path if running as standalone script
+if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 from modules.utils.auth import connect_client
 from modules.utils.group_utils import read_groups_from_file
 from config import OUTPUT_DIR
@@ -98,3 +105,17 @@ async def process_item(client, msg, output_dir, args, existing_items):
     """
     # Example: no-op (override this in your module)
     return False
+
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+
+    parser = argparse.ArgumentParser(description="Universal Task Module (Template)")
+    get_args(parser)
+    args = parser.parse_args()
+
+    try:
+        asyncio.run(run(args))
+    except KeyboardInterrupt:
+        pass

@@ -1,4 +1,12 @@
 import os
+import sys
+
+# Add project root to sys.path if running as standalone script
+if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
 import json
 from modules.utils.auth import connect_client
 from modules.utils.output import info, error, success, warning, progress
@@ -213,3 +221,17 @@ async def collect_replies(client, group, msg) -> dict:
             pass
             
     return result
+
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+    
+    parser = argparse.ArgumentParser(description="Telegram Message Scraper")
+    get_args(parser)
+    args = parser.parse_args()
+    
+    try:
+        asyncio.run(run(args))
+    except KeyboardInterrupt:
+        pass

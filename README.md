@@ -9,6 +9,7 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
 -   **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
 -   **Infrastructure Hunter**: Analyze and detect shared infrastructure (domains, users, bots) across multiple channels to find overlaps.
 -   **Modular Design**: Easy to extend with new task modules.
+-   **Web Interface**: A modern, responsive web UI for managing and running tasks.
 
 ## Installation
 
@@ -37,7 +38,42 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
         API_HASH=your_api_hash_here
         ```
 
-## Usage
+## Web Interface
+
+A modern, responsive web interface for TelegramTools built with Flask.
+
+### Features
+- 🎨 **Modern UI** - Beautiful glassmorphism design with smooth animations
+- 📱 **Responsive** - Works on desktop, tablet, and mobile devices
+- ⚡ **Real-time Progress** - Live updates during module execution via Server-Sent Events
+- 🔧 **Dynamic Forms** - Auto-generated forms based on module arguments
+- 📊 **Results Display** - Clear visualization of execution results and outputs
+
+### Quick Start
+Run the web server:
+```bash
+python app.py
+```
+The web interface will be available at: **http://localhost:5000**
+
+### Usage
+1. Open your browser and navigate to `http://localhost:5000`
+2. Select a module from the dashboard
+3. Fill in the required parameters (forms are auto-generated)
+4. Click "Run Module" and monitor real-time progress
+5. View results and download output files
+
+### Form Field Types
+- **Text inputs** - Strings/Usernames
+- **Number inputs** - Limits/Counts
+- **Checkboxes** - Boolean flags
+- **Textareas** - Lists (one per line or comma-separated)
+
+### Troubleshooting
+- **Port in use**: Change port in `app.py`.
+- **Module not found**: Ensure modules are in `modules/tasks/` and have `get_args()`.
+
+## CLI Usage
 
 The toolkit uses a central entry point `main.py`. You can run specific modules using the `-m` flag.
 
@@ -112,6 +148,10 @@ python main.py -m connector --groups @channel_A @channel_B --min-user-overlap 5
 ## Project Structure
 
 -   `main.py`: CLI entry point.
+-   `app.py`: Web interface entry point.
+-   `web_runner.py`: Backend integration for Web UI.
+-   `templates/`: HTML templates for Web UI.
+-   `static/`: CSS and JS assets for Web UI.
 -   `config.py`: Configuration and environment variable loading.
 -   `modules/tasks/`: individual task modules (`message_scraper.py`, `user_export.py`, etc.).
 -   `data/`: Default directory for inputs and outputs.

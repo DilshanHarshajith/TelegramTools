@@ -15,9 +15,9 @@ from config import OUTPUT_DIR, REPLY_ITER_LIMIT
 def get_args(parser):
     parser.add_argument(
         "-k", "--keyword",
-        type=str,
-        default="",
-        help="Keyword to search messages"
+        nargs="+",
+        default=[],
+        help="Keywords/phrases to search messages (one or more). Messages matching ANY keyword will be included."
     )
     parser.add_argument(
         "-l", "--limit",
@@ -84,7 +84,7 @@ async def run(args):
 async def scrape_group(
     client,
     group,
-    keyword,
+    keywords,
     limit,
     module_output,
     verbose: bool = False,
@@ -95,7 +95,7 @@ async def scrape_group(
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
 
-    info(f"Scraping {group} for '{keyword}' (limit={limit or 'all'})")
+    info(f"Scraping {group} for {keywords if keywords else 'all messages'} (limit={limit or 'all'})")
     messages = []
     scanned = 0
     matched = 0
@@ -107,7 +107,18 @@ async def scrape_group(
             if not await should_include_message(msg, user_filter):
                 continue
 
-            if msg.message and (keyword.lower() in msg.message.lower() or keyword == ""):
+            # Match if no keywords provided OR if any keyword matches
+            match = False
+            if not keywords:
+                match = True
+            elif msg.message:
+                msg_text_lower = msg.message.lower()
+                for kw in keywords:
+                    if kw.lower() in msg_text_lower:
+                        match = True
+                        break
+
+            if match:
                 matched += 1
                 entry = {
                     "id": msg.id,

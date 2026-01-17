@@ -170,11 +170,6 @@ def execute_module(module_name):
                     processed_data[key] = int(value) if value else 0
                 except (ValueError, TypeError):
                     processed_data[key] = 0
-            # Handle lists (groups, etc.)
-            elif key == 'groups' and isinstance(value, str):
-                # Split by newlines or commas
-                groups = [g.strip() for g in value.replace(',', '\n').split('\n') if g.strip()]
-                processed_data[key] = groups
             else:
                 processed_data[key] = value
         

@@ -152,22 +152,53 @@ class ModuleExecutor:
                 
                 # Check if this argument expects a list (nargs='+', '*', etc.)
                 if action and action.nargs in ['+', '*']:
+                    # Start with existing list if any
+                    current_list = getattr(args, key, []) or []
+                    if not isinstance(current_list, list):
+                        current_list = []
+                    
+                    new_items = []
                     # Convert string to list if needed
                     if isinstance(value, str):
                         # Split by commas, newlines, or spaces
-                        items = [v.strip() for v in value.replace(',', '\n').split('\n') if v.strip()]
-                        setattr(args, key, items)
+                        new_items = [v.strip() for v in value.replace(',', '\n').split('\n') if v.strip()]
                     elif isinstance(value, list):
-                        setattr(args, key, value)
+                        new_items = value
                     else:
-                        setattr(args, key, [value])
-                # Handle list types (like groups) - check dest name
-                elif isinstance(value, str) and key == 'groups':
-                    setattr(args, key, [v.strip() for v in value.replace(',', '\n').split('\n') if v.strip()])
-                elif isinstance(value, list):
-                    setattr(args, key, value)
+                        new_items = [value]
+                    
+                    # Extend unique items
+                    current_list.extend(new_items)
+                    setattr(args, key, current_list)
                 else:
                     setattr(args, key, value)
+
+        # Process file uploads for list arguments (e.g. groups_file)
+        for key in list(form_data.keys()):
+            if key.endswith('_file'):
+                base_key = key[:-5]
+                action = actions_by_dest.get(base_key)
+                
+                if action and action.nargs in ['+', '*']:
+                    file_path = form_data[key]
+                    if file_path and os.path.isfile(file_path):
+                        try:
+                            # Generic file reading
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read()
+                            
+                            # Parse content same as text input (newlines, commas)
+                            file_items = [v.strip() for v in content.replace(',', '\n').split('\n') if v.strip()]
+                            
+                            # Merge with existing
+                            current_list = getattr(args, base_key, []) or []
+                            if not isinstance(current_list, list):
+                                current_list = []
+                                
+                            current_list.extend(file_items)
+                            setattr(args, base_key, current_list)
+                        except Exception as e:
+                            print(f"Error reading file {file_path}: {e}")
         
         # Process common args (like groups file handling)
         self.app.process_common_args(args)

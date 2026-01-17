@@ -36,7 +36,7 @@ def get_args(parser):
     parser.add_argument(
         "--output",
         type=str,
-        help="Optional CSV path for saving mappings (default: data/output/user_mapper/mappings.csv)",
+        help="Output filename for saving mappings (default: mappings.csv). Will be saved to data/output/user_mapper/",
     )
     parser.add_argument(
         "--photo",
@@ -54,7 +54,12 @@ async def run(args):
     client = await connect_client()
     module_output = os.path.join(OUTPUT_DIR, "user_mapper")
     os.makedirs(module_output, exist_ok=True)
-    output_csv = args.output or os.path.join(module_output, "mappings.csv")
+    
+    # If output is provided, treat it as a filename only (not full path)
+    if args.output:
+        output_csv = os.path.join(module_output, args.output)
+    else:
+        output_csv = os.path.join(module_output, "mappings.csv")
 
     mappings: List[Dict[str, str]] = []
     resolved_users: List[User] = []

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block page_title %}Home{% endblock %}
+
+{% block content %}
+<div class="welcome-section">
+    <div class="welcome-card glass-card">
+        <h1 class="gradient-text">Welcome to TelegramTools</h1>
+        <p class="subtitle">A powerful suite of tools for Telegram data analysis and automation</p>
+    </div>
+</div>
+
+<div class="modules-grid">
+    {% for module in modules %}
+    <a href="{{ module.url }}" class="module-card glass-card">
+        <div class="module-header">
+            <h3>{{ module.name.replace('_', ' ').title() }}</h3>
+        </div>
+        <div class="module-body">
+            <p>{{ module.description or 'Click to configure and run this module' }}</p>
+        </div>
+        <div class="module-footer">
+            <span class="btn-link">Launch Module →</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<div class="info-section">
+    <div class="info-card glass-card">
+        <h3>📊 Quick Stats</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ modules|length }}</div>
+                <div class="stat-label">Available Modules</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">✓</div>
+                <div class="stat-label">API Connected</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-card glass-card">
+        <h3>🚀 Getting Started</h3>
+        <ol class="getting-started-list">
+            <li>Select a module from the grid above</li>
+            <li>Fill in the required parameters</li>
+            <li>Click "Run Module" to start execution</li>
+            <li>Monitor progress in real-time</li>
+            <li>Download results when complete</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}

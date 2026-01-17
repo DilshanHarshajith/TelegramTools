@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TelegramTools{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>📱 TelegramTools</h1>
+                <p class="tagline">Web Interface</p>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+                    <span class="icon">🏠</span>
+                    <span>Home</span>
+                </a>
+
+                <a href="{{ url_for('dashboard') }}"
+                    class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="nav-section">
+                    <h3>Modules</h3>
+                    <a href="{{ url_for('module_page', module_name='connector') }}" class="nav-item">
+                        <span class="icon">🔗</span>
+                        <span>Connector</span>
+                    </a>
+                    <a href="{{ url_for('module_page', module_name='message_scraper') }}" class="nav-item">
+                        <span class="icon">💬</span>
+                        <span>Message Scraper</span>
+                    </a>
+                    <a href="{{ url_for('module_page', module_name='user_export') }}" class="nav-item">
+                        <span class="icon">👥</span>
+                        <span>User Export</span>
+                    </a>
+                    <a href="{{ url_for('module_page', module_name='user_mapper') }}" class="nav-item">
+                        <span class="icon">🗺️</span>
+                        <span>User Mapper</span>
+                    </a>
+                    <a href="{{ url_for('module_page', module_name='origin_tracer') }}" class="nav-item">
+                        <span class="icon">🔍</span>
+                        <span>Origin Tracer</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p>v1.0.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                {% block header %}
+                <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+                {% endblock %}
+            </header>
+
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

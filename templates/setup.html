@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Setup - TelegramTools{% endblock %}
+
+{% block page_title %}Initial Setup{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>API Credentials Required</h3>
+    </div>
+    <div class="card-body">
+        <p class="description">
+            To use TelegramTools, you need to provide your Telegram API credentials.
+            These will be saved to your <code>.env</code> file.
+        </p>
+
+        <div class="alert alert-info" style="margin-bottom: 20px;">
+            <strong>How to get credentials:</strong>
+            <ol style="margin-left: 20px; margin-top: 10px;">
+                <li>Log in to <a href="https://my.telegram.org/apps" target="_blank" rel="noopener">my.telegram.org</a>
+                </li>
+                <li>Go to "API development tools"</li>
+                <li>Create a new application (if you haven't already)</li>
+                <li>Copy the <strong>App api_id</strong> and <strong>App api_hash</strong></li>
+            </ol>
+        </div>
+
+        <form method="POST" action="{{ url_for('setup') }}" class="setup-form">
+            <div class="form-group">
+                <label for="api_id">API ID</label>
+                <input type="text" id="api_id" name="api_id" class="form-control" required placeholder="e.g. 12345678">
+            </div>
+
+            <div class="form-group">
+                <label for="api_hash">API Hash</label>
+                <input type="text" id="api_hash" name="api_hash" class="form-control" required
+                    placeholder="e.g. a1b2c3d4e5f6g7h8i9j0">
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save & Continue</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .setup-form {
+        max-width: 600px;
+        margin-top: 20px;
+    }
+
+    .alert-info a {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

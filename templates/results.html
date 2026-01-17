@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block page_title %}Results{% endblock %}
+
+{% block content %}
+<div class="results-page">
+    <div class="results-header glass-card">
+        <h2>Execution Results</h2>
+        <div class="results-meta">
+            <span class="meta-item">
+                <strong>Module:</strong> {{ module_name.replace('_', ' ').title() }}
+            </span>
+            <span class="meta-item">
+                <strong>Task ID:</strong> <code>{{ task_id }}</code>
+            </span>
+            <span class="meta-item status-badge status-{{ status.status }}">
+                {{ status.status.upper() }}
+            </span>
+        </div>
+    </div>
+
+    {% if status.status == 'complete' %}
+    <div class="results-success glass-card">
+        <h3>✅ Execution Completed Successfully</h3>
+
+        {% if status.result and status.result.stdout %}
+        <div class="output-section">
+            <h4>Output</h4>
+            <pre class="output-content">{{ status.result.stdout }}</pre>
+        </div>
+        {% endif %}
+
+        <div class="results-actions">
+            <a href="{{ url_for('module_page', module_name=module_name) }}" class="btn btn-primary">
+                Run Again
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                Back to Home
+            </a>
+        </div>
+    </div>
+
+    {% elif status.status == 'error' %}
+    <div class="results-error glass-card">
+        <h3>❌ Execution Failed</h3>
+
+        {% if status.result and status.result.message %}
+        <div class="error-message">
+            <strong>Error:</strong> {{ status.result.message }}
+        </div>
+        {% endif %}
+
+        {% if status.result and status.result.stderr %}
+        <div class="output-section">
+            <h4>Error Details</h4>
+            <pre class="output-content error">{{ status.result.stderr }}</pre>
+        </div>
+        {% endif %}
+
+        <div class="results-actions">
+            <a href="{{ url_for('module_page', module_name=module_name) }}" class="btn btn-primary">
+                Try Again
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                Back to Home
+            </a>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="results-pending glass-card">
+        <h3>⏳ Execution In Progress</h3>
+        <p>The task is still running. Please wait...</p>
+        <div class="loading-spinner"></div>
+
+        <script>
+            // Only auto-refresh if status is 'running'
+            const taskStatus = "{{ status.status }}";
+            if (taskStatus === 'running') {
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
+            }
+        </script>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

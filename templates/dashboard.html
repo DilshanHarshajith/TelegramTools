@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block page_title %}Task Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="dashboard-header glass-card">
+        <h2>Running Tasks Dashboard</h2>
+        <p class="subtitle">Monitor all active and completed module executions</p>
+        <div class="dashboard-actions">
+            <button onclick="location.reload()" class="btn btn-secondary">
+                <span class="btn-icon">↻</span>
+                Refresh
+            </button>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <span class="btn-icon">➕</span>
+                New Task
+            </a>
+        </div>
+    </div>
+
+    {% if tasks and tasks|length > 0 %}
+    <div class="tasks-grid">
+        {% for task in tasks %}
+        <div class="task-card glass-card status-{{ task.status }}">
+            <div class="task-header">
+                <h3>{{ task.module.replace('_', ' ').title() }}</h3>
+                <span class="status-badge status-{{ task.status }}">
+                    {{ task.status.upper() }}
+                </span>
+            </div>
+
+            <div class="task-body">
+                <div class="task-meta">
+                    <span class="meta-item">
+                        <strong>Task ID:</strong>
+                        <code class="task-id-short">{{ task.task_id[:8] }}...</code>
+                    </span>
+                    {% if task.is_alive %}
+                    <span class="meta-item">
+                        <span class="pulse-indicator"></span>
+                        Running
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if task.messages and task.messages|length > 0 %}
+                <div class="task-messages">
+                    {% for msg in task.messages[-3:] %}
+                    <div class="message-item">
+                        {% if msg.type == 'status' %}
+                        📝 {{ msg.message }}
+                        {% elif msg.type == 'complete' %}
+                        ✅ Completed
+                        {% elif msg.type == 'error' %}
+                        ❌ {{ msg.message }}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="task-footer">
+                <a href="{{ url_for('results_page', task_id=task.task_id) }}" class="btn btn-primary btn-sm">
+                    View Details
+                </a>
+                {% if task.status == 'complete' %}
+                <a href="{{ url_for('module_page', module_name=task.module) }}" class="btn btn-secondary btn-sm">
+                    Run Again
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state glass-card">
+        <div class="empty-icon">📋</div>
+        <h3>No Tasks Yet</h3>
+        <p>Start by running a module from the home page</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            <span class="btn-icon">🚀</span>
+            Go to Modules
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% if tasks %}
+{% set running_tasks = tasks|selectattr('status', 'equalto', 'running')|list %}
+{% if running_tasks|length > 0 %}
+<script>
+    // Auto-refresh every 5 seconds while tasks are running
+    setTimeout(function () {
+        location.reload();
+    }, 5000);
+</script>
+{% endif %}
+{% endif %}
+
+<style>
+    .dashboard-page {
+        max-width: 1400px;
+    }
+
+    .dashboard-header {
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .dashboard-header h2 {
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .dashboard-header .subtitle {
+        color: var(--text-secondary);
+        margin-bottom: var(--spacing-md);
+    }
+
+    .dashboard-actions {
+        display: flex;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+    }
+
+    .tasks-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: var(--spacing-lg);
+    }
+
+    .task-card {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .task-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+    }
+
+    .task-card.status-running::before {
+        background: var(--warning);
+        animation: pulse 2s infinite;
+    }
+
+    .task-card.status-complete::before {
+        background: var(--success);
+    }
+
+    .task-card.status-error::before {
+        background: var(--error);
+    }
+
+    .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .task-header h3 {
+        font-size: 1.125rem;
+        color: var(--primary-light);
+        margin: 0;
+    }
+
+    .task-body {
+        flex: 1;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .task-meta {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        margin-bottom: var(--spacing-md);
+    }
+
+    .task-id-short {
+        font-size: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+    }
+
+    .pulse-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: var(--warning);
+        border-radius: 50%;
+        margin-right: 0.25rem;
+        animation: pulse 2s infinite;
+    }
+
+    .task-messages {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-sm);
+        font-size: 0.875rem;
+    }
+
+    .message-item {
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+        line-height: 1.4;
+    }
+
+    .message-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .task-footer {
+        display: flex;
+        gap: var(--spacing-xs);
+    }
+
+    .btn-sm {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: var(--spacing-xl);
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .empty-state h3 {
+        margin-bottom: var(--spacing-sm);
+        color: var(--text-primary);
+    }
+
+    .empty-state p {
+        color: var(--text-secondary);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    @media (max-width: 768px) {
+        .tasks-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

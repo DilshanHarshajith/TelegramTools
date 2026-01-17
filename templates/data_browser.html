@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Data Browser - TelegramTools{% endblock %}
+
+{% block page_title %}Data Browser{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('data_browser') }}">Data</a>
+            {% for crumb in breadcrumbs %}
+            <span class="separator">/</span>
+            <a href="{{ url_for('data_browser', subpath=crumb.path) }}">{{ crumb.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if subpath %}
+                    <tr>
+                        <td>
+                            <a
+                                href="{{ url_for('data_browser', subpath='/'.join(subpath.split('/')[:-1]) if '/' in subpath else '') }}">
+                                <span class="icon">📁</span> ..
+                            </a>
+                        </td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                    {% endif %}
+
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            {% if item.is_dir %}
+                            <a href="{{ url_for('data_browser', subpath=item.rel_path) }}">
+                                <span class="icon">📁</span> {{ item.name }}
+                            </a>
+                            {% else %}
+                            <span class="icon">📄</span> {{ item.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not item.is_dir %}
+                            {% if item.size < 1024 %} {{ item.size }} B {% elif item.size < 1024 * 1024 %} {{ "%.2f"
+                                |format(item.size / 1024) }} KB {% else %} {{ "%.2f" |format(item.size / (1024 * 1024))
+                                }} MB {% endif %} {% else %} - {% endif %} </td>
+                        <td>{{ item.modified }}</td>
+                        <td>
+                            {% if not item.is_dir %}
+                            <a href="{{ url_for('download_file', filepath=item.rel_path) }}"
+                                class="btn btn-sm btn-primary">
+                                <span>⬇️</span> Download
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if not items %}
+                    <tr>
+                        <td colspan="4" class="text-center">No files or directories found.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
+    .breadcrumb .separator {
+        color: var(--text-muted);
+    }
+
+    .breadcrumb a {
+        color: var(--primary);
+        text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .data-table th {
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .data-table tr:hover {
+        background-color: var(--bg-secondary);
+    }
+
+    .icon {
+        display: inline-block;
+        width: 1.5rem;
+        text-align: center;
+        margin-right: 0.5rem;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}

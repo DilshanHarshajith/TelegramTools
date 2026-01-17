@@ -2,7 +2,7 @@
 Flask Web UI for TelegramTools
 Main application entry point
 """
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, redirect, url_for, send_from_directory
 import os
 import sys
 import json
@@ -256,6 +256,70 @@ def results_page(task_id):
                          task_id=task_id,
                          module_name=status['module'],
                          status=status)
+
+
+@app.route('/data')
+@app.route('/data/<path:subpath>')
+def data_browser(subpath=""):
+    """Browse the output directory."""
+    base_dir = os.path.abspath(config.OUTPUT_DIR)
+    current_dir = os.path.abspath(os.path.join(base_dir, subpath))
+    
+    # Security check: ensure current_dir is within base_dir
+    if not current_dir.startswith(base_dir):
+        return render_template('error.html', error="Access denied"), 403
+    
+    if not os.path.exists(current_dir):
+        return render_template('error.html', error="Directory not found"), 404
+    
+    items = []
+    for item in sorted(os.listdir(current_dir)):
+        item_path = os.path.join(current_dir, item)
+        rel_path = os.path.relpath(item_path, base_dir)
+        
+        is_dir = os.path.isdir(item_path)
+        size = os.path.getsize(item_path) if not is_dir else 0
+        
+        items.append({
+            'name': item,
+            'rel_path': rel_path,
+            'is_dir': is_dir,
+            'size': size,
+            'modified': time.ctime(os.path.getmtime(item_path))
+        })
+    
+    # Calculate breadcrumbs
+    breadcrumbs = []
+    parts = subpath.split('/') if subpath else []
+    curr_path = ""
+    for part in parts:
+        if not part: continue
+        curr_path = os.path.join(curr_path, part)
+        breadcrumbs.append({'name': part, 'path': curr_path})
+        
+    return render_template('data_browser.html', 
+                         items=items, 
+                         subpath=subpath, 
+                         breadcrumbs=breadcrumbs)
+
+
+@app.route('/download/<path:filepath>')
+def download_file(filepath):
+    """Download a file from the output directory."""
+    base_dir = os.path.abspath(config.OUTPUT_DIR)
+    file_path = os.path.abspath(os.path.join(base_dir, filepath))
+    
+    # Security check: ensure file_path is within base_dir
+    if not file_path.startswith(base_dir):
+        return jsonify({'error': 'Access denied'}), 403
+        
+    if not os.path.exists(file_path) or os.path.isdir(file_path):
+        return jsonify({'error': 'File not found'}), 404
+        
+    directory = os.path.dirname(file_path)
+    filename = os.path.basename(file_path)
+    
+    return send_from_directory(directory, filename, as_attachment=True)
 
 
 @app.errorhandler(404)

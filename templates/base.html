@@ -30,6 +30,12 @@
                     <span>Dashboard</span>
                 </a>
 
+                <a href="{{ url_for('data_browser') }}"
+                    class="nav-item {% if request.endpoint == 'data_browser' %}active{% endif %}">
+                    <span class="icon">📂</span>
+                    <span>Data</span>
+                </a>
+
                 <div class="nav-section">
                     <h3>Modules</h3>
                     <a href="{{ url_for('module_page', module_name='connector') }}" class="nav-item">

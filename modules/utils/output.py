@@ -5,7 +5,7 @@ import config
 
 def info(message: str) -> None:
     """Print info message with [+] prefix."""
-    print(f"[+] {message}") if config.VERBOSE or config.INFO else None  
+    print(f"[*] {message}") if config.VERBOSE or config.INFO else None  
 
 def error(message: str) -> None:
     """Print error message with [!] prefix."""
@@ -21,5 +21,5 @@ def success(message: str) -> None:
 
 def progress(message: str) -> None:
     """Print progress message with [*] prefix."""
-    print(f"[*] {message}") if config.VERBOSE or config.PROGRESS else None
+    print(f"[+] {message}") if config.VERBOSE or config.PROGRESS else None
 

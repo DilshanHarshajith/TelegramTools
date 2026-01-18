@@ -13,7 +13,7 @@ import collections
 from telethon import utils
 from telethon.tl.types import PeerChannel, PeerUser, PeerChat
 from modules.utils.auth import connect_client
-from modules.utils.output import info, success, warning, error
+from modules.utils.output import info, success, warning, error, progress
 from modules.utils.group_utils import read_groups_from_file
 from config import OUTPUT_DIR
 

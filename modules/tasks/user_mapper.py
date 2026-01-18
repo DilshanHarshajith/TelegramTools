@@ -13,7 +13,7 @@ from typing import Iterable, List, Dict, Set
 from telethon.tl.types import User
 
 from modules.utils.auth import connect_client
-from modules.utils.output import info, success, warning, error
+from modules.utils.output import info, success, warning, error, progress
 from modules.utils.user_utils import resolve_user_from_string, parse_user_inputs
 from modules.utils.photo_utils import download_photos_batch, format_download_stats
 from config import OUTPUT_DIR

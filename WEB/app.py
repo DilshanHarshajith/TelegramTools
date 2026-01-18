@@ -282,16 +282,7 @@ def results_page(task_id):
         stdout = status['result']['stdout']
         
         # More robust regex collection
-        # Matches "saved to [path]", "Saved to [path]", "exported to [path]",
-        # or even "Processing group: [name]" (which we can guess the path for)
-        patterns = [
-            r'[Ss]aved to\s+([\w\-/\\:. ]+)',
-            r'[Ee]xported to\s+([\w\-/\\:. ]+)',
-            r'[Rr]esults for this group are in\s+([\w\-/\\:. ]+)',
-            r'[Oo]utput(?:\s+path)?[:\s]+([\w\-/\\:. ]+)',
-            r'[Pp]rocessing group[:\s]+([\w\-/\\:. ]+)',
-            r'[Cc]ollecting (?:infrastructure|data) for[:\s]+([\w\-/\\:. ]+)'
-        ]
+        patterns = config.FILE_PATH_PATTERNS
         
         all_matches = []
         base_dir = os.path.abspath(config.OUTPUT_DIR)

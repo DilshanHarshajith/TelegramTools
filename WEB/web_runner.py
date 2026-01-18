@@ -12,6 +12,11 @@ import re
 from typing import Dict, Any, Optional, List
 from contextlib import redirect_stdout, redirect_stderr
 import os
+import sys
+
+# Add parent directory to path for root module imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from main import TelegramToolsApp
 import config
 import modules.utils.auth as auth

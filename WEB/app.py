@@ -5,6 +5,10 @@ Main application entry point
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, redirect, url_for, send_from_directory
 import os
 import sys
+
+# Add parent directory to path for root module imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import time
 import tempfile
@@ -12,7 +16,7 @@ from werkzeug.utils import secure_filename
 import dotenv
 
 # Load env variables first
-dotenv.load_dotenv()
+dotenv.load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 # Check for required credentials before importing config via web_runner
 SETUP_REQUIRED = False
@@ -70,8 +74,8 @@ def setup():
         api_hash = request.form.get('api_hash')
         
         if api_id and api_hash:
-            # Write to .env file
-            env_path = os.path.join(os.path.dirname(__file__), '.env')
+            # Write to .env file in the root directory
+            env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
             with open(env_path, 'a') as f:
                 f.write(f"\nAPI_ID={api_id}\n")
                 f.write(f"\nAPI_HASH={api_hash}\n")

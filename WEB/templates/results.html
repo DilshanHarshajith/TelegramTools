@@ -70,17 +70,95 @@
     {% else %}
     <div class="results-pending glass-card">
         <h3>⏳ Execution In Progress</h3>
-        <p>The task is still running. Please wait...</p>
-        <div class="loading-spinner"></div>
+        <p>The task is still running. Viewing live output below:</p>
+
+        <div class="progress-section" style="margin-top: 20px;">
+            <div class="progress-bar-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 10%;"></div>
+                </div>
+            </div>
+            <div id="progressMessages" class="progress-messages"
+                style="height: 300px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-top: 15px; font-family: monospace;">
+            </div>
+            <div id="progressStatus" class="progress-status"
+                style="margin-top: 10px; font-size: 0.9em; color: var(--text-secondary);">Initializing real-time
+                stream...</div>
+        </div>
 
         <script>
-            // Only auto-refresh if status is 'running'
-            const taskStatus = "{{ status.status }}";
-            if (taskStatus === 'running') {
-                setTimeout(() => {
-                    location.reload();
-                }, 3000);
-            }
+            document.addEventListener('DOMContentLoaded', function () {
+                const taskId = "{{ task_id }}";
+                const progressFill = document.getElementById('progressFill');
+                const progressMessages = document.getElementById('progressMessages');
+                const progressStatus = document.getElementById('progressStatus');
+
+                const eventSource = new EventSource(`/api/stream/${taskId}`);
+                let progressValue = 10;
+
+                function addProgressMessage(message, type = 'info') {
+                    const timestamp = new Date().toLocaleTimeString();
+                    const color = {
+                        'info': 'rgba(255,255,255,0.6)',
+                        'success': '#4caf50',
+                        'error': '#f44336',
+                        'warning': '#ff9800',
+                        'stdout': '#ffffff',
+                        'stderr': '#f44336'
+                    }[type] || 'rgba(255,255,255,0.6)';
+
+                    const messageEl = document.createElement('div');
+                    messageEl.style.color = color;
+                    messageEl.style.marginBottom = '5px';
+                    messageEl.style.whiteSpace = 'pre-wrap';
+                    messageEl.textContent = `[${timestamp}] ${message}`;
+
+                    progressMessages.appendChild(messageEl);
+                    progressMessages.scrollTop = progressMessages.scrollHeight;
+                }
+
+                eventSource.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+
+                    switch (data.type) {
+                        case 'status':
+                            progressStatus.textContent = data.message;
+                            progressValue = Math.min(progressValue + 5, 90);
+                            progressFill.style.width = progressValue + '%';
+                            addProgressMessage(data.message, 'info');
+                            break;
+
+                        case 'stdout':
+                            addProgressMessage(data.message, 'stdout');
+                            break;
+
+                        case 'stderr':
+                            addProgressMessage(data.message, 'stderr');
+                            break;
+
+                        case 'complete':
+                        case 'done':
+                            progressFill.style.width = '100%';
+                            progressStatus.innerHTML = '<span style="color: #4caf50;">✅ Execution completed! Reloading...</span>';
+                            eventSource.close();
+                            setTimeout(() => location.reload(), 1500);
+                            break;
+
+                        case 'error':
+                            progressFill.style.width = '100%';
+                            progressFill.style.background = '#f44336';
+                            progressStatus.innerHTML = `<span style="color: #f44336;">❌ Error: ${data.message}</span>`;
+                            addProgressMessage(`Error: ${data.message}`, 'error');
+                            eventSource.close();
+                            setTimeout(() => location.reload(), 3000);
+                            break;
+                    }
+                };
+
+                eventSource.onerror = function () {
+                    eventSource.close();
+                };
+            });
         </script>
     </div>
     {% endif %}

@@ -69,6 +69,28 @@ def strip_ansi_codes(text: str) -> str:
     return text
 
 
+class QueueWriter(io.StringIO):
+    """
+    A file-like object that writes to a queue.
+    Used to capture stdout/stderr and stream it in real-time.
+    """
+    def __init__(self, q: queue.Queue, msg_type: str = 'log'):
+        super().__init__()
+        self.q = q
+        self.msg_type = msg_type
+
+    def write(self, s):
+        if s:
+            # Strip ANSI codes before putting in queue
+            clean_s = strip_ansi_codes(s)
+            if clean_s.strip():
+                self.q.put({
+                    'type': self.msg_type,
+                    'message': clean_s
+                })
+        return super().write(s)
+
+
 class ModuleExecutor:
     """Handles async execution of TelegramTools modules in background threads."""
     
@@ -213,21 +235,22 @@ class ModuleExecutor:
     def execute_module(self, task_id: str, module_name: str, args: argparse.Namespace, 
                       output_queue: queue.Queue) -> None:
         """
-        Execute a module in a background thread with output capture.
+        Execute a module in a background thread with real-time output capture.
         """
-        # Capture stdout and stderr
-        stdout_capture = io.StringIO()
-        stderr_capture = io.StringIO()
+        # Capture stdout and stderr with real-time queue streaming
+        stdout_writer = QueueWriter(output_queue, 'stdout')
+        stderr_writer = QueueWriter(output_queue, 'stderr')
         
         try:
             output_queue.put({'type': 'status', 'message': f'Starting {module_name}...'})
             
             # Run the async module in a new event loop
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            with redirect_stdout(stdout_writer), redirect_stderr(stderr_writer):
                 asyncio.run(self.app.run_module(module_name, args))
             
-            stdout_text = strip_ansi_codes(stdout_capture.getvalue())
-            stderr_text = strip_ansi_codes(stderr_capture.getvalue())
+            # Get the full contents for the final 'complete' message
+            stdout_text = strip_ansi_codes(stdout_writer.getvalue())
+            stderr_text = strip_ansi_codes(stderr_writer.getvalue())
             
             output_queue.put({
                 'type': 'complete',
@@ -240,8 +263,8 @@ class ModuleExecutor:
             output_queue.put({
                 'type': 'error',
                 'message': str(e),
-                'stdout': strip_ansi_codes(stdout_capture.getvalue()),
-                'stderr': strip_ansi_codes(stderr_capture.getvalue())
+                'stdout': strip_ansi_codes(stdout_writer.getvalue()),
+                'stderr': strip_ansi_codes(stderr_writer.getvalue())
             })
     
     def start_module_execution(self, module_name: str, form_data: Dict[str, Any]) -> str:

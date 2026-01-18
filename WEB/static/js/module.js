@@ -91,12 +91,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Show success message
             addProgressMessage(`Task ${taskId.substring(0, 8)}... created`, 'success');
-            addProgressMessage('Redirecting to dashboard...', 'info');
 
-            // Redirect to dashboard to monitor all tasks
-            setTimeout(() => {
-                window.location.href = '/dashboard';
-            }, 1500);
+            // Start monitoring progress live on this page instead of redirecting
+            startProgressMonitoring(taskId);
 
         } catch (error) {
             console.error('Error:', error);
@@ -182,12 +179,16 @@ document.addEventListener('DOMContentLoaded', function () {
             'info': 'var(--text-secondary)',
             'success': 'var(--success)',
             'error': 'var(--error)',
-            'warning': 'var(--warning)'
+            'warning': 'var(--warning)',
+            'stdout': 'var(--text-primary)',
+            'stderr': 'var(--error)'
         }[type] || 'var(--text-secondary)';
 
         const messageEl = document.createElement('div');
         messageEl.style.color = color;
         messageEl.style.marginBottom = '0.5rem';
+        messageEl.style.fontFamily = 'monospace';
+        messageEl.style.whiteSpace = 'pre-wrap';
         messageEl.textContent = `[${timestamp}] ${message}`;
 
         progressMessages.appendChild(messageEl);

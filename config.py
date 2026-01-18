@@ -27,6 +27,17 @@ PROGRESS = True
 DISCOVER_IGNORE = ['!']
 WEB_IGNORE = ['#']
 
+#File path patterns regex
+# Matches "saved to [path]", "Saved to [path]", "exported to [path]" or even "Processing group: [name]" (which we can guess the path for)
+FILE_PATH_PATTERNS = [
+            r'[Ss]aved to\s+([\w\-/\\:. ]+)',
+            r'[Ee]xported to\s+([\w\-/\\:. ]+)',
+            r'[Rr]esults for this group are in\s+([\w\-/\\:. ]+)',
+            r'[Oo]utput(?:\s+path)?[:\s]+([\w\-/\\:. ]+)',
+            r'[Pp]rocessing group[:\s]+([\w\-/\\:. ]+)',
+            r'[Cc]ollecting (?:infrastructure|data) for[:\s]+([\w\-/\\:. ]+)'
+        ]
+
 # Validate required API credentials
 if not API_ID or not API_HASH:
     print("[!] Error: API_ID and API_HASH must be set in environment variables or .env file")

@@ -110,6 +110,8 @@ class TelegramToolsApp:
             
         for f in os.listdir(MODULES_DIR):
             if f.endswith(".py") and f != "__init__.py":
+                if any(f.startswith(prefix) for prefix in config.DISCOVER_IGNORE):
+                    continue
                 name = f[:-3]
                 try:
                     spec = importlib.util.spec_from_file_location(

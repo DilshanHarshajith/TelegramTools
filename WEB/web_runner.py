@@ -107,8 +107,9 @@ class ModuleExecutor:
         self.running_tasks: Dict[str, Dict[str, Any]] = {}
         
     def get_modules(self) -> Dict[str, Any]:
-        """Return discovered modules."""
-        return self.app.modules
+        """Return discovered modules, filtering those meant for CLI only."""
+        return {name: mod for name, mod in self.app.modules.items() 
+                if not any(name.startswith(prefix) for prefix in config.WEB_IGNORE)}
     
     def get_module_args_spec(self, module_name: str) -> List[Dict[str, Any]]:
         """

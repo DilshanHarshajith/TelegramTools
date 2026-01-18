@@ -1,12 +1,13 @@
 # TelegramTools
 
-A comprehensive toolkit for Telegram automation, data scraping, and analysis using the Telethon library. This project provides modular tools for scraping messages, exporting user data, resolving usernames, and analyzing infrastructure overlap between groups.
+A comprehensive toolkit for Telegram automation, data scraping, and analysis using the Telethon library. This project provides modular tools for scraping messages, exporting user data, resolving usernames, tracing message origins, and analyzing infrastructure overlap between groups.
 
 ## Features
 
--   **Message Scraper**: Search and export messages from groups based on keywords, with options to include replies and filter by user.
+-   **Message Scraper**: Search and export messages from groups based on keywords, with options to include replies and filter by user. Now supports multiple keywords.
 -   **User Export**: Scrape user members from groups and download high-quality profile photos.
 -   **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
+-   **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
 -   **Infrastructure Hunter**: Analyze and detect shared infrastructure (domains, users, bots) across multiple channels to find overlaps.
 -   **Modular Design**: Easy to extend with new task modules.
 -   **Web Interface**: A modern, responsive web UI for managing and running tasks.
@@ -30,9 +31,9 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
     -   Go to [my.telegram.org](https://my.telegram.org).
     -   Log in and create a new application to get your `API_ID` and `API_HASH`.
 
-2.  **Set up Environment Variables**:
-    -   Create a `.env` file in the project root (or rename `.env.example` if available).
-    -   Add your credentials:
+2.  **Set up Credentials**:
+    -   **Web UI (Recommended)**: Start the web server and use the built-in setup page to enter your credentials.
+    -   **Manual**: Create a `.env` file in the project root and add:
         ```env
         API_ID=12345678
         API_HASH=your_api_hash_here
@@ -48,30 +49,22 @@ A modern, responsive web interface for TelegramTools built with Flask.
 - ⚡ **Real-time Progress** - Live updates during module execution via Server-Sent Events
 - 🔧 **Dynamic Forms** - Auto-generated forms based on module arguments
 - 📊 **Results Display** - Clear visualization of execution results and outputs
+- 📂 **Data Browser** - Browse and download results directly from the UI
 
 ### Quick Start
 Run the web server:
 ```bash
-python app.py
+python WEB/app.py
 ```
 The web interface will be available at: **http://localhost:5000**
 
 ### Usage
 1. Open your browser and navigate to `http://localhost:5000`
-2. Select a module from the dashboard
-3. Fill in the required parameters (forms are auto-generated)
-4. Click "Run Module" and monitor real-time progress
-5. View results and download output files
-
-### Form Field Types
-- **Text inputs** - Strings/Usernames
-- **Number inputs** - Limits/Counts
-- **Checkboxes** - Boolean flags
-- **Textareas** - Lists (one per line or comma-separated)
-
-### Troubleshooting
-- **Port in use**: Change port in `app.py`.
-- **Module not found**: Ensure modules are in `modules/tasks/` and have `get_args()`.
+2. If it's your first time, you'll be redirected to the **Setup** page to enter your API credentials.
+3. Select a module from the dashboard.
+4. Fill in the required parameters (forms are auto-generated).
+5. Click "Run Module" and monitor real-time progress.
+6. View results and download output files via the results page or the **Data Browser**.
 
 ## CLI Usage
 
@@ -87,17 +80,12 @@ python main.py --list-modules
 Search for messages containing specific keywords in one or more groups.
 
 **Arguments:**
--   `-k`, `--keyword` (Required): Keyword to search for.
+-   `-k`, `--keyword` (Required): Keyword(s) to search for.
 -   `--groups`: List of group links/usernames or a file containing them.
 -   `--limit`: Max messages to scan per group (default: 0 = all).
 -   `--user`: Filter by sender ID or username.
 -   `--replies`: Include replies to matching messages in the output.
 -   `-v`: Verbose output.
-
-**Example:**
-```bash
-python main.py -m message_scraper --groups @group1 @group2 -k "password" --limit 1000 -v
-```
 
 ### 2. User Export (`user_export`)
 Extract user lists from groups and download profile photos.
@@ -108,16 +96,6 @@ Extract user lists from groups and download profile photos.
 -   `--no-photos`: Disable downloading profile photos.
 -   `--limit`: Max messages to scan for finding users.
 
-**Example (Scan group):**
-```bash
-python main.py -m user_export --groups https://t.me/example_chat --limit 500
-```
-
-**Example (Download specific user photos):**
-```bash
-python main.py -m user_export --users "123456789, 987654321"
-```
-
 ### 3. User Mapper (`user_mapper`)
 Resolve a list of usernames or IDs to their full Telegram entity details.
 
@@ -126,12 +104,16 @@ Resolve a list of usernames or IDs to their full Telegram entity details.
 -   `--file`: File containing one username/ID per line.
 -   `--output`: Custom path for the CSV output.
 
-**Example:**
-```bash
-python main.py -m user_mapper --inputs @durov @telegram 1234567
-```
+### 4. Origin Tracer (`origin_tracer`)
+Trace the original source of forwarded messages.
 
-### 4. Infrastructure Hunter (`connector`)
+**Arguments:**
+-   `--groups`: Telegram group/channel links or usernames to analyze.
+-   `--message-id`: Specific Message ID to trace origin for (Single Message Mode).
+-   `--limit`: Maximum messages to scan per group (Bulk Mode).
+-   `--min-count`: Minimum forwards required to report a source (Bulk Mode).
+
+### 5. Infrastructure Hunter (`connector`)
 Analyze shared infrastructure (domains, users, bots) between multiple channels.
 
 **Arguments:**
@@ -140,19 +122,17 @@ Analyze shared infrastructure (domains, users, bots) between multiple channels.
 -   `--min-domain-overlap`: Minimum shared domains to report.
 -   `--export-graphml`: Export findings to a GraphML file.
 
-**Example:**
-```bash
-python main.py -m connector --groups @channel_A @channel_B --min-user-overlap 5
-```
-
 ## Project Structure
 
 -   `main.py`: CLI entry point.
--   `app.py`: Web interface entry point.
--   `web_runner.py`: Backend integration for Web UI.
--   `templates/`: HTML templates for Web UI.
--   `static/`: CSS and JS assets for Web UI.
 -   `config.py`: Configuration and environment variable loading.
--   `modules/tasks/`: individual task modules (`message_scraper.py`, `user_export.py`, etc.).
+-   `modules/`: 
+    -   `modules/tasks/`: Individual task modules (`message_scraper.py`, `user_export.py`, `origin_tracer.py`, etc.).
+    -   `modules/utils/`: Shared utilities (auth, output, group handling).
+-   `WEB/`: Flask Web UI.
+    -   `WEB/app.py`: Web interface entry point.
+    -   `WEB/web_runner.py`: Backend integration for Web UI.
+    -   `WEB/templates/`: HTML templates.
+    -   `WEB/static/`: CSS and JS assets.
 -   `data/`: Default directory for inputs and outputs.
     -   `data/output/`: Generated results (JSONs, CSVs, downloads).

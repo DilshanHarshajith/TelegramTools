@@ -15,6 +15,14 @@ DEFAULT_KEYWORD = ""
 DEFAULT_LIMIT = 1000
 REPLY_ITER_LIMIT = 500
 
+# Output settings
+VERBOSE = True
+INFO = True
+SUCCESS = True
+WARNING = False
+ERROR = False
+PROGRESS = True
+
 # Validate required API credentials
 if not API_ID or not API_HASH:
     print("[!] Error: API_ID and API_HASH must be set in environment variables or .env file")

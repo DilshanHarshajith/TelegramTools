@@ -187,7 +187,7 @@ async def trace_bulk_group(client, group, args, module_output):
 
     # Resolve Entities for top keys
     # To optimize, we can resolve them in batch or just get_entity
-    info("Resolving source names...")
+    progress("Resolving source names...")
     
     final_data = []
     
@@ -238,7 +238,7 @@ async def trace_bulk_group(client, group, args, module_output):
                 "Type": row['type']
             })
             
-    success(f"Report saved to: {csv_path}")
+    info(f"Report saved to: {csv_path}")
 
 # ------------------------
 # Utils

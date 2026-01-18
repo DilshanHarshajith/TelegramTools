@@ -101,13 +101,13 @@ async def run(args):
 
         summary_csv = os.path.join(module_output, "infra_overlaps.csv")
         _write_overlaps_csv(summary_csv, overlaps)
-        success(f"Saved {len(overlaps)} overlap record(s) to {summary_csv}")
+        info(f"Saved {len(overlaps)} overlap record(s) to {summary_csv}")
 
         # Placeholder for optional future GraphML export
         if args.export_graphml:
             graph_path = os.path.join(module_output, "infra_graph.graphml")
             _write_graphml_placeholder(graph_path)
-            success(f"GraphML export placeholder created at {graph_path}")
+            info(f"GraphML export placeholder created at {graph_path}")
 
     except KeyboardInterrupt:
         warning("\nUser interrupted, stopping infra_reuse_hunter...")

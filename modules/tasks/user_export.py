@@ -108,7 +108,7 @@ async def handle_users_mode(client, users_arg, args, module_output):
         error("No valid user IDs found in --users argument")
         return
 
-    info(f"Found {len(user_ids)} unique user IDs")
+    progress(f"Found {len(user_ids)} unique user IDs")
     os.makedirs(output_dir, exist_ok=True)
     await process_photo_downloads(client, user_ids, output_dir, args)
 
@@ -248,7 +248,7 @@ async def process_photo_downloads(client, users_or_ids, output_dir, args):
         warning("No valid users to download photos for.")
         return
 
-    progress(f"Starting download for {len(users_to_download)} users...")
+    info(f"Starting download for {len(users_to_download)} users...")
     
     successful, skipped, no_photo, failed = await download_photos_batch(
         client, 
@@ -258,7 +258,7 @@ async def process_photo_downloads(client, users_or_ids, output_dir, args):
     )
     
     result_msg = format_download_stats(successful, skipped, no_photo, failed)
-    success(f"Profile photos: {result_msg} - saved to {output_dir}")
+    info(f"Profile photos: {result_msg} - saved to {output_dir}")
 
 
 if __name__ == "__main__":

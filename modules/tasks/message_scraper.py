@@ -134,7 +134,7 @@ async def scrape_group(
 
                 if verbose:
                     snippet = msg.message.replace("\n", " ")[:80]
-                    info(f"{group} | sender_id={msg.sender_id} | \"{snippet}\"")
+                    progress(f"{group} | sender_id={msg.sender_id} | \"{snippet}\"")
 
                 if matched % 10 == 0:
                     progress(f"{group}: found {matched} matching messages after scanning {scanned}")
@@ -159,7 +159,7 @@ async def scrape_group(
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(messages, f, indent=4, ensure_ascii=False)
-            success(f"Saved {len(messages)} messages (scanned {scanned}) to {path}")
+            info(f"Saved {len(messages)} messages (scanned {scanned}) to {path}")
         except Exception as e:
             error(f"Error saving messages to {path}: {e}")
 

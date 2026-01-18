@@ -82,17 +82,17 @@ async def run(args):
         mappings.append(mapping)
 
         username_display = f"@{mapping['username'] if mapping['username'] else '<no_username>'}  | {mapping['first_name']} {mapping['last_name']}"
-        success(f"{raw_value} -> id: {mapping['user_id']} | username: {username_display}")
+        progress(f"{raw_value} -> id: {mapping['user_id']} | username: {username_display}")
 
     _write_mappings_csv(output_csv, mappings)
     
     if args.photo and resolved_users:
-        info("Downloading profile photos...")
+        progress("Downloading profile photos...")
         stats = await download_photos_batch(client, resolved_users, module_output, verbose=True)
-        success(format_download_stats(*stats))
+        info(format_download_stats(*stats))
 
     await client.disconnect()
-    success(f"Saved {len(mappings)} mapping(s) to {output_csv}")
+    info(f"Saved {len(mappings)} mapping(s) to {output_csv}")
 
 
 def _collect_inputs(cli_values: Iterable[str], file_path: str) -> List[str]:

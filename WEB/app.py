@@ -12,6 +12,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import time
 import tempfile
+import shutil
+import zipfile
+import re
 from werkzeug.utils import secure_filename
 import dotenv
 
@@ -273,10 +276,144 @@ def results_page(task_id):
         return render_template('error.html', 
                              error='Task not found'), 404
     
+    # Try to find an output folder in the stdout to provide a direct download link
+    output_folder = None
+    if status.get('result') and status['result'].get('stdout'):
+        stdout = status['result']['stdout']
+        
+        # More robust regex collection
+        # Matches "saved to [path]", "Saved to [path]", "exported to [path]",
+        # or even "Processing group: [name]" (which we can guess the path for)
+        patterns = [
+            r'[Ss]aved to\s+([\w\-/\\:. ]+)',
+            r'[Ee]xported to\s+([\w\-/\\:. ]+)',
+            r'[Rr]esults for this group are in\s+([\w\-/\\:. ]+)',
+            r'[Oo]utput(?:\s+path)?[:\s]+([\w\-/\\:. ]+)',
+            r'[Pp]rocessing group[:\s]+([\w\-/\\:. ]+)',
+            r'[Cc]ollecting (?:infrastructure|data) for[:\s]+([\w\-/\\:. ]+)'
+        ]
+        
+        all_matches = []
+        base_dir = os.path.abspath(config.OUTPUT_DIR)
+        
+        for pattern in patterns:
+            for match in re.finditer(pattern, stdout):
+                val = match.group(1).strip().rstrip('.!?, ')
+                if not val: continue
+                
+                # Check if it's already a path
+                all_matches.append(val)
+                
+                # If it looks like a group/link, also try the sanitized version
+                if '://' in val or val.startswith('@'):
+                    sanitized = val.replace('/', '_').strip()
+                    all_matches.append(sanitized)
+        
+        # Also just look for ANY string that looks like it could be a folder in our output
+        # (e.g. data/output/module/name)
+        if status['module'] in stdout:
+            # specifically search for subpaths of the module output
+            module_path_pattern = rf'{status["module"]}/([\w\-_.]+)'
+            for match in re.finditer(module_path_pattern, stdout):
+                all_matches.append(os.path.join(status['module'], match.group(1)))
+
+        if all_matches:
+            # Try to resolve matches from last to first
+            for folder_path in reversed(all_matches):
+                # Check various possibilities for the found path
+                candidates = [
+                    os.path.abspath(folder_path),
+                    os.path.abspath(os.path.join(base_dir, folder_path)),
+                    os.path.abspath(os.path.join(base_dir, status['module'], folder_path)),
+                    os.path.abspath(os.path.join(os.getcwd(), folder_path))
+                ]
+                
+                resolved = None
+                for cand_abs in candidates:
+                    if cand_abs.startswith(base_dir) and os.path.exists(cand_abs):
+                        if os.path.isfile(cand_abs):
+                            cand_abs = os.path.dirname(cand_abs)
+                        
+                        rel = os.path.relpath(cand_abs, base_dir)
+                        if rel != '.':
+                            resolved = rel
+                            break
+                
+                if resolved:
+                    output_folder = resolved
+                    break
+        
+        # Fallback: if no specific folder found in logs, check module's folder
+        if not output_folder:
+            module_dir = os.path.join(base_dir, status['module'])
+            if os.path.exists(module_dir):
+                # Try to find the MOST RECENT subfolder in the module dir
+                subdirs = [os.path.join(module_dir, d) for d in os.listdir(module_dir) 
+                          if os.path.isdir(os.path.join(module_dir, d))]
+                if subdirs:
+                    latest_subdir = max(subdirs, key=os.path.getmtime)
+                    output_folder = os.path.relpath(latest_subdir, base_dir)
+                else:
+                    # Just the module folder itself
+                    output_folder = status['module']
+
     return render_template('results.html',
                          task_id=task_id,
                          module_name=status['module'],
-                         status=status)
+                         status=status,
+                         output_folder=output_folder)
+
+
+@app.route('/download_folder/<path:folderpath>')
+def download_folder(folderpath):
+    """Download an entire folder as a ZIP file."""
+    base_dir = os.path.abspath(config.OUTPUT_DIR)
+    folder_path = os.path.abspath(os.path.join(base_dir, folderpath))
+    
+    # Security check: ensure folder_path is within base_dir
+    if not folder_path.startswith(base_dir):
+        return jsonify({'error': 'Access denied'}), 403
+        
+    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+        return jsonify({'error': 'Folder not found'}), 404
+    
+    # Create a temporary ZIP file
+    temp_dir = tempfile.mkdtemp(prefix='tt_zip_')
+    zip_name = os.path.basename(folder_path) or "output"
+    zip_path = os.path.join(temp_dir, f"{zip_name}.zip")
+    
+    try:
+        # Create ZIP without the full path structure
+        shutil.make_archive(os.path.join(temp_dir, zip_name), 'zip', folder_path)
+        
+        return send_from_directory(temp_dir, f"{zip_name}.zip", as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': f"Failed to create ZIP: {str(e)}"}), 500
+    # Note: temp_dir cleanup is tricky with send_from_directory unless we use a custom generator
+    # For now, it will stay in /tmp until system cleanup, which is acceptable for small/medium tools
+
+
+@app.route('/api/delete/<path:filepath>', methods=['POST', 'DELETE'])
+def delete_item(filepath):
+    """Delete a file or folder from the output directory."""
+    base_dir = os.path.abspath(config.OUTPUT_DIR)
+    target_path = os.path.abspath(os.path.join(base_dir, filepath))
+    
+    # Security check: ensure target_path is within base_dir
+    if not target_path.startswith(base_dir):
+        return jsonify({'error': 'Access denied'}), 403
+    
+    if not os.path.exists(target_path):
+        return jsonify({'error': 'Item not found'}), 404
+        
+    try:
+        if os.path.isdir(target_path):
+            shutil.rmtree(target_path)
+        else:
+            os.remove(target_path)
+        return jsonify({'success': True, 'message': f'Deleted {os.path.basename(target_path)}'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/data')

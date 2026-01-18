@@ -31,6 +31,11 @@
         {% endif %}
 
         <div class="results-actions">
+            {% if output_folder %}
+            <a href="{{ url_for('download_folder', folderpath=output_folder) }}" class="btn btn-success">
+                <span>📦</span> Download Full Output (ZIP)
+            </a>
+            {% endif %}
             <a href="{{ url_for('module_page', module_name=module_name) }}" class="btn btn-primary">
                 Run Again
             </a>
@@ -58,6 +63,11 @@
         {% endif %}
 
         <div class="results-actions">
+            {% if output_folder %}
+            <a href="{{ url_for('download_folder', folderpath=output_folder) }}" class="btn btn-outline-primary">
+                <span>📦</span> Download Partial Output (ZIP)
+            </a>
+            {% endif %}
             <a href="{{ url_for('module_page', module_name=module_name) }}" class="btn btn-primary">
                 Try Again
             </a>

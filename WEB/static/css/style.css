@@ -472,6 +472,45 @@ body {
     font-size: 1.125rem;
 }
 
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669; /* Slightly darker shade of var(--success) */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-light);
+    border: 1px solid var(--primary-light);
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-light);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: var(--error);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
 /* Progress Section */
 .progress-section {
     margin-top: var(--spacing-lg);

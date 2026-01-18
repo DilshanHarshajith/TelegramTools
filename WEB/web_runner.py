@@ -63,8 +63,15 @@ def strip_ansi_codes(text: str) -> str:
     # Remove any remaining escape-like patterns
     text = re.sub(r'\x1B\]8;[^\x07\x1B]*(?:\x07|\x1B\\)', '', text)
     
+    # Remove \r (carriage return) which tqdm uses to overwrite lines
+    # We want to keep only the text after the last \r on a line, or just strip them
+    text = text.replace('\r', '\n')
+    
     # Clean up trailing colons and extra spaces left from removed sequences
     text = re.sub(r':\s*$', '', text, flags=re.MULTILINE)
+    
+    # Remove excessive blank lines
+    text = re.sub(r'\n\s*\n', '\n', text)
     
     return text
 

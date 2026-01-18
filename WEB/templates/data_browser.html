@@ -59,13 +59,23 @@
                                 |format(item.size / 1024) }} KB {% else %} {{ "%.2f" |format(item.size / (1024 * 1024))
                                 }} MB {% endif %} {% else %} - {% endif %} </td>
                         <td>{{ item.modified }}</td>
-                        <td>
-                            {% if not item.is_dir %}
+                        <td class="actions">
+                            {% if item.is_dir %}
+                            <a href="{{ url_for('download_folder', folderpath=item.rel_path) }}"
+                                class="btn btn-sm btn-outline-primary" title="Download as ZIP">
+                                <span>📦</span> Download ZIP
+                            </a>
+                            {% else %}
                             <a href="{{ url_for('download_file', filepath=item.rel_path) }}"
                                 class="btn btn-sm btn-primary">
                                 <span>⬇️</span> Download
                             </a>
                             {% endif %}
+
+                            <button onclick="deleteItem('{{ item.rel_path }}', '{{ item.name }}')"
+                                class="btn btn-sm btn-danger" title="Delete">
+                                <span>🗑️</span> Delete
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -138,5 +148,34 @@
         padding: 0.25rem 0.5rem;
         font-size: 0.85rem;
     }
+
+    .actions {
+        display: flex;
+        gap: 0.5rem;
+    }
 </style>
+
+<script>
+    async function deleteItem(relPath, name) {
+        if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/delete/${relPath}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('An error occurred while deleting the item.');
+        }
+    }
+</script>
 {% endblock %}

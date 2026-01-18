@@ -7,7 +7,10 @@ import sys
 import shlex
 import traceback
 import logging
+import re
 from typing import Dict, Any, Optional
+
+import modules.utils.output as output_mod
 
 from rich.console import Console
 from rich.panel import Panel
@@ -18,16 +21,78 @@ from rich.text import Text
 
 from modules.utils.group_utils import read_groups_from_file
 
-# Configure logging with Rich
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True, markup=True)]
-)
+# Determine if running as main
+IS_MAIN = __name__ == "__main__"
 
-logger = logging.getLogger("TelegramTools")
-console = Console()
+if IS_MAIN:
+    # Configure logging with Rich
+    logging.basicConfig(
+        level="INFO",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, markup=True)]
+    )
+    logger = logging.getLogger("TelegramTools")
+    console = Console()
+else:
+    logger = None
+    console = None
+
+def _strip_markup(text: str) -> str:
+    """Remove rich markup like [red]...[/red]"""
+    return re.sub(r'\[/?[a-z]+\]', '', str(text))
+
+def log_info(message: str):
+    if IS_MAIN:
+        logger.info(message)
+    else:
+        output_mod.info(_strip_markup(message))
+
+def log_error(message: str):
+    if IS_MAIN:
+        logger.error(message)
+    else:
+        output_mod.error(_strip_markup(message))
+
+def log_warning(message: str):
+    if IS_MAIN:
+        logger.warning(message)
+    else:
+        output_mod.warning(_strip_markup(message))
+
+def log_success(message: str):
+    if IS_MAIN:
+        logger.info(f"[green][✓][/green] {message}")
+    else:
+        output_mod.success(_strip_markup(message))
+
+def log_progress(message: str):
+    if IS_MAIN:
+        logger.info(f"[blue][*][/blue] {message}")
+    else:
+        output_mod.progress(_strip_markup(message))
+
+def log_print(*args, **kwargs):
+    if IS_MAIN:
+        console.print(*args, **kwargs)
+    else:
+        # Simplistic print for imported mode
+        if args:
+            print(_strip_markup(args[0]))
+
+def log_exception(message: Optional[str] = None):
+    if IS_MAIN:
+        if message:
+            logger.error(message)
+        console.print_exception()
+    else:
+        if message:
+            output_mod.error(_strip_markup(message))
+        traceback.print_exc()
+
+def log_clear():
+    if IS_MAIN:
+        console.clear()
 
 MODULES_DIR = "modules/tasks"
 
@@ -40,7 +105,7 @@ class TelegramToolsApp:
         """Return {module_name: module_object} for all Python files in modules/tasks/ except __init__.py"""
         modules = {}
         if not os.path.isdir(MODULES_DIR):
-            logger.error(f"[red]Modules directory not found: {MODULES_DIR}[/red]")
+            log_error(f"[red]Modules directory not found: {MODULES_DIR}[/red]")
             return modules
             
         for f in os.listdir(MODULES_DIR):
@@ -55,24 +120,23 @@ class TelegramToolsApp:
                         spec.loader.exec_module(module)
                         modules[name] = module
                 except Exception as e:
-                    logger.error(f"[red]Failed to load module {name}: {e}[/red]")
+                    log_error(f"[red]Failed to load module {name}: {e}[/red]")
         self.modules = modules
         return modules
 
     async def run_module(self, module_name: str, args: argparse.Namespace):
         module = self.modules.get(module_name)
         if not module:
-            logger.error(f"[red]Module '{module_name}' not found[/red]")
+            log_error(f"[red]Module '{module_name}' not found[/red]")
             return
 
         if hasattr(module, "run"):
             try:
                 await module.run(args)
             except Exception as e:
-                logger.error(f"[red]Error running module '{module_name}': {e}[/red]")
-                console.print_exception()
+                log_exception(f"Error running module '{module_name}': {e}")
         else:
-            logger.error(f"[red]Module '{module_name}' has no run() coroutine.[/red]")
+            log_error(f"[red]Module '{module_name}' has no run() coroutine.[/red]")
 
     def get_module_parser(self, module_name: str, module: Any) -> argparse.ArgumentParser:
         """
@@ -95,7 +159,7 @@ class TelegramToolsApp:
             border_style="cyan",
             padding=(1, 2)
         )
-        console.print(panel)
+        log_print(panel)
 
     def process_common_args(self, args: argparse.Namespace):
         """
@@ -115,7 +179,7 @@ class TelegramToolsApp:
         Continuously prompt user for module selection until exit.
         """
         while self.running:
-            console.clear()
+            log_clear()
             self.print_banner()
             
             table = Table(title="Available Modules", show_header=True, header_style="bold magenta")
@@ -126,8 +190,8 @@ class TelegramToolsApp:
             for i, name in enumerate(module_names, 1):
                 table.add_row(str(i), name)
 
-            console.print(table)
-            console.print("\n[bold red]0[/bold red]) Exit")
+            log_print(table)
+            log_print("\n[bold red]0[/bold red]) Exit")
 
             selected_module_name = None
             
@@ -137,7 +201,7 @@ class TelegramToolsApp:
                     choice = choice_str.strip()
                     
                     if choice == '0' or choice.lower() == 'exit':
-                        console.print("[yellow]Exiting...[/yellow]")
+                        log_print("[yellow]Exiting...[/yellow]")
                         self.running = False
                         return
 
@@ -149,30 +213,30 @@ class TelegramToolsApp:
                         selected_module_name = choice
                     
                     if not selected_module_name:
-                        console.print("[red]Invalid selection. Please try again.[/red]")
+                        log_print("[red]Invalid selection. Please try again.[/red]")
                 except KeyboardInterrupt:
-                    console.print("\n[yellow]Exiting...[/yellow]")
+                    log_print("\n[yellow]Exiting...[/yellow]")
                     self.running = False
                     return
 
             # Module selected
-            console.print(f"\n[bold cyan][+] Selected Module: {selected_module_name}[/bold cyan]")
+            log_print(f"\n[bold cyan][+] Selected Module: {selected_module_name}[/bold cyan]")
             module = self.modules[selected_module_name]
             
             # 1. Create parser and show help
             parser = self.get_module_parser(selected_module_name, module)
-            console.print(Panel(f"[bold]Module Help: {selected_module_name}[/bold]", style="magenta"))
+            log_print(Panel(f"[bold]Module Help: {selected_module_name}[/bold]", style="magenta"))
             parser.print_help()
-            console.print("-" * 60, style="dim")
+            log_print("-" * 60, style="dim")
 
             # 2. Ask for arguments
-            console.print("[bold]Enter arguments for the module (e.g. --limit 50).[/bold]")
-            console.print("Press [bold]Enter[/bold] to run with defaults.")
+            log_print("[bold]Enter arguments for the module (e.g. --limit 50).[/bold]")
+            log_print("Press [bold]Enter[/bold] to run with defaults.")
             
             try:
                 arg_str = Prompt.ask("Args")
             except KeyboardInterrupt:
-                console.print("\n[yellow]Returning to menu.[/yellow]")
+                log_print("\n[yellow]Returning to menu.[/yellow]")
                 continue
 
             # 3. Parse and Run
@@ -182,18 +246,18 @@ class TelegramToolsApp:
                 
                 self.process_common_args(module_args)
                 
-                console.print(f"\n[bold green][+] Running {selected_module_name}...[/bold green]\n")
+                log_print(f"\n[bold green][+] Running {selected_module_name}...[/bold green]\n")
                 await self.run_module(selected_module_name, module_args)
                 
-                console.print(f"\n[bold green][+] {selected_module_name} finished.[/bold green]")
+                log_print(f"\n[bold green][+] {selected_module_name} finished.[/bold green]")
                 Prompt.ask("\nPress Enter to return to main menu")
                 
             except SystemExit:
                 # argparse calls sys.exit on error or --help
-                console.print("\n[yellow][!] Argument checking failed (or help displayed). Returning to menu.[/yellow]")
+                log_print("\n[yellow][!] Argument checking failed (or help displayed). Returning to menu.[/yellow]")
                 continue
             except Exception as e:
-                logger.exception(f"Error during execution: {e}")
+                log_exception(f"Error during execution: {e}")
                 Prompt.ask("\nPress Enter to return to main menu")
 
     def parse_cli_args(self):
@@ -207,9 +271,9 @@ class TelegramToolsApp:
         base_args, remaining_args = parent_parser.parse_known_args()
 
         if base_args.list_modules:
-            console.print("[+] Available task modules:")
+            log_print("[+] Available task modules:")
             for m in sorted(self.modules.keys()):
-                console.print(f"- {m}")
+                log_print(f"- {m}")
             sys.exit(0)
 
         # Handle Help if no module selected
@@ -248,4 +312,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("\n[!] Interrupted by user. Exiting...")
+        log_info("\n[!] Interrupted by user. Exiting...")

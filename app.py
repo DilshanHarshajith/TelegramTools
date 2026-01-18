@@ -43,6 +43,23 @@ def check_setup():
         return redirect(url_for('setup'))
 
 
+@app.context_processor
+def inject_modules():
+    """Inject the list of modules into all templates for the sidebar."""
+    modules = executor.get_modules()
+    module_list = []
+    
+    for name in sorted(modules.keys()):
+        # Format name: connector -> Connector, message_scraper -> Message Scraper
+        display_name = name.replace('_', ' ').title()
+        module_list.append({
+            'name': name,
+            'display_name': display_name
+        })
+        
+    return dict(nav_modules=module_list)
+
+
 @app.route('/setup', methods=['GET', 'POST'])
 def setup():
     """Handle initial setup of API credentials."""

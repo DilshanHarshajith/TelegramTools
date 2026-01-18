@@ -23,6 +23,10 @@ WARNING = False
 ERROR = False
 PROGRESS = True
 
+# Ignore modules
+DISCOVER_IGNORE = ['!']
+WEB_IGNORE = ['#']
+
 # Validate required API credentials
 if not API_ID or not API_HASH:
     print("[!] Error: API_ID and API_HASH must be set in environment variables or .env file")

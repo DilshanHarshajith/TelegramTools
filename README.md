@@ -5,11 +5,12 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
 ## Features
 
 -   **Message Scraper**: Search and export messages from groups based on keywords, with options to include replies and filter by user. Now supports multiple keywords.
+-   **Terminal Chat**: Interactive terminal-based chat client with recent chat list, message history, and search functionality. (CLI Only)
 -   **User Export**: Scrape user members from groups and download high-quality profile photos.
 -   **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
 -   **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
 -   **Infrastructure Hunter**: Analyze and detect shared infrastructure (domains, users, bots) across multiple channels to find overlaps.
--   **Modular Design**: Easy to extend with new task modules.
+-   **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore, `#` to hide from Web UI).
 -   **Web Interface**: A modern, responsive web UI for managing and running tasks.
 
 ## Installation
@@ -121,6 +122,26 @@ Analyze shared infrastructure (domains, users, bots) between multiple channels.
 -   `--min-user-overlap`: Minimum shared users to report.
 -   `--min-domain-overlap`: Minimum shared domains to report.
 -   `--export-graphml`: Export findings to a GraphML file.
+-   `-v`: Verbose output.
+
+### 6. Terminal Chat (`#terminal_chat`)
+An interactive terminal-based chat client. Note: This module is intended for CLI use only and is hidden from the Web UI.
+
+**Arguments:**
+-   `--limit`: Number of recent chats to display in the list (default: 20).
+-   `s`: Search for a contact or group by username, phone number, or Chat ID.
+-   `0`: Return to the main menu.
+-   `Esc`: Exit the current chat or return to the main menu.
+-   `/back`: Exit the current chat.
+-   `/refresh`: Refresh the current chat history.
+
+## Interactive Mode
+
+If you run `main.py` without any arguments, it enters an **Interactive Mode**:
+```bash
+python main.py
+```
+This mode provides a menu-driven interface to select and configure modules. For standard modules, it will prompt you for arguments after selection. For interactive modules like `#terminal_chat`, it will skip the argument prompt and start immediately.
 
 ## Project Structure
 

@@ -1,6 +1,7 @@
 """
 Output formatting utilities for consistent console output across modules.
 """
+import config
 
 def info(message: str) -> None:
     """Print info message with [+] prefix."""

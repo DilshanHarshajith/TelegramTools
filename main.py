@@ -233,14 +233,20 @@ class TelegramToolsApp:
             log_print("-" * 60, style="dim")
 
             # 2. Ask for arguments
-            log_print("[bold]Enter arguments for the module (e.g. --limit 50).[/bold]")
-            log_print("Press [bold]Enter[/bold] to run with defaults.")
+            is_interactive = getattr(module, "IS_INTERACTIVE", False)
             
-            try:
-                arg_str = Prompt.ask("Args")
-            except KeyboardInterrupt:
-                log_print("\n[yellow]Returning to menu.[/yellow]")
-                continue
+            if is_interactive:
+                log_print("[bold yellow][!] This is an interactive module. Skipping argument prompt.[/bold yellow]")
+                arg_str = ""
+            else:
+                log_print("[bold]Enter arguments for the module (e.g. --limit 50).[/bold]")
+                log_print("Press [bold]Enter[/bold] to run with defaults.")
+                
+                try:
+                    arg_str = Prompt.ask("Args")
+                except KeyboardInterrupt:
+                    log_print("\n[yellow]Returning to menu.[/yellow]")
+                    continue
 
             # 3. Parse and Run
             try:

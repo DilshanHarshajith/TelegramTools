@@ -6,6 +6,8 @@ import termios
 import select
 from typing import List, Optional
 
+IS_INTERACTIVE = True
+
 # Add project root to sys.path
 if __name__ == "__main__":
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

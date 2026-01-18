@@ -20,6 +20,7 @@ from rich.logging import RichHandler
 from rich.text import Text
 
 from modules.utils.group_utils import read_groups_from_file
+import config
 
 # Determine if running as main
 IS_MAIN = __name__ == "__main__"

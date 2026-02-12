@@ -1,0 +1,13 @@
+*
+!modules/
+!modules/**
+!main.py
+!config.py
+!requirements.txt
+!README.md
+!LICENSE
+!.gitignore
+!WEB/
+!WEB/**
+**/__pycache__/
+__pycache__

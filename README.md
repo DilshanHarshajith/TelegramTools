@@ -108,7 +108,7 @@ Dump comprehensive user information and download profile photos.
 
 **Arguments:**
 
-- `users` (Required): Usernames, IDs, or file path containing them.
+- `users` (Required): Usernames, IDs, Phone numbers (starting with +), or file path containing them.
 - `--photos`: Download all profile photos.
 - `-o`, `--out`: Output directory (default: data/output/info).
 

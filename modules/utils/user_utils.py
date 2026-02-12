@@ -3,7 +3,9 @@ Shared utilities for user resolution and ID parsing.
 """
 
 from typing import List, Optional, Union
-from telethon.tl.types import User, PeerUser
+from typing import List, Optional, Union
+from telethon import functions
+from telethon.tl.types import User, PeerUser, InputPhoneContact
 from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError, PeerIdInvalidError
 from modules.utils.output import error, warning
 
@@ -38,11 +40,66 @@ def parse_user_ids_string(input_str: Optional[str]) -> List[str]:
     return [i for i in inputs if i.isdigit()]
 
 
+async def resolve_phone(client, phone: str) -> Optional[User]:
+    """
+    Resolve a phone number to a User entity.
+    Attempts direct resolution first, then falls back to import-contact method.
+    """
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    
+    try:
+        # 1. Try to resolve directly
+        try:
+            entity = await client.get_entity(phone)
+            if isinstance(entity, User):
+                return entity
+        except Exception:
+            pass
+
+        # 2. Add as contact to "force" resolution
+        contact = InputPhoneContact(
+            client_id=0,
+            phone=phone,
+            first_name="TelegramTools",
+            last_name="Search"
+        )
+        
+        result = await client(functions.contacts.ImportContactsRequest(
+            contacts=[contact]
+        ))
+
+        # Check imported users
+        if result.users:
+            imported_user = result.users[0]
+            
+            # Clean up: Remove the contact we just added
+            await client(functions.contacts.DeleteContactsRequest(id=[imported_user.id]))
+            
+            # Now fetch the fresh entity to ensure we have the latest info
+            try:
+                user = await client.get_entity(imported_user.id)
+                if not user.phone:
+                     user.phone = imported_user.phone
+                return user
+            except Exception:
+                return imported_user
+        else:
+             return None
+
+    except Exception as e:
+        error(f"Error resolving phone {phone}: {e}")
+        return None
+
+
 async def resolve_user_from_string(client, value: str) -> Optional[User]:
     """
-    Resolve a username (with or without @) or numeric ID string to a Telethon User entity.
+    Resolve a username (with or without @), numeric ID string, or phone number (starting with +) to a Telethon User entity.
     """
     cleaned = value.strip()
+    
+    if cleaned.startswith("+"):
+        return await resolve_phone(client, cleaned)
+
     if cleaned.startswith("@"):
         cleaned = cleaned[1:]
 

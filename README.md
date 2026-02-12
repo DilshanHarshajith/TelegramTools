@@ -10,6 +10,7 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
 - **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
 - **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
 - **Info Dumper**: Deep dive into user profiles, status, and history (JSON dump + photos).
+- **Find Account**: Lookup Telegram account details by phone number.
 - **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore).
 
 ## Installation
@@ -57,12 +58,13 @@ Search for messages containing specific keywords in one or more groups.
 
 **Arguments:**
 
-- `-k`, `--keyword` (Required): Keyword(s) to search for.
+- `-k`, `--keyword`: Keyword(s) to search for. Required unless `--user` is provided.
 - `--groups`: List of group links/usernames or a file containing them.
-- `--limit`: Max messages to scan per group (default: 0 = all).
-- `--user`: Filter by sender ID or username.
+- `-l`, `--limit`: Max messages to scan per group (default: 0 = all).
+- `--user`: Filter by sender ID or username. Required unless `--keyword` is provided.
 - `--replies`: Include replies to matching messages in the output.
-- `-v`: Verbose output.
+- `-v`, `--verbose`: Verbose output (show matching snippets).
+- `--out`: Output directory.
 
 ### 2. User Export (`user_export`)
 
@@ -70,10 +72,11 @@ Extract user lists from groups and download profile photos.
 
 **Arguments:**
 
-- `--groups`: List of groups to scan.
-- `--users`: Inline list of user IDs or a file path to download photos for specific users (skips group scan).
+- `groups` (Positional): List of group links or a file containing groups.
 - `--no-photos`: Disable downloading profile photos.
 - `--limit`: Max messages to scan for finding users.
+- `-v`, `--verbose`: Show usernames during scan.
+- `--out`: Output directory.
 
 ### 3. User Mapper (`user_mapper`)
 
@@ -83,7 +86,9 @@ Resolve a list of usernames or IDs to their full Telegram entity details.
 
 - `--inputs`: List of usernames/IDs to resolve.
 - `--file`: File containing one username/ID per line.
-- `--output`: Custom path for the CSV output.
+- `--output`: Custom filename for the CSV output.
+- `--photo`: Download user photos.
+- `--out`: Output directory.
 
 ### 4. Origin Tracer (`origin_tracer`)
 
@@ -95,6 +100,7 @@ Trace the original source of forwarded messages.
 - `--message-id`: Specific Message ID to trace origin for (Single Message Mode).
 - `--limit`: Maximum messages to scan per group (Bulk Mode).
 - `--min-count`: Minimum forwards required to report a source (Bulk Mode).
+- `--out`: Output directory.
 
 ### 5. Info Dumper (`info`)
 
@@ -104,7 +110,7 @@ Dump comprehensive user information and download profile photos.
 
 - `users` (Required): Usernames, IDs, or file path containing them.
 - `--photos`: Download all profile photos.
-- `-v`, `--verbose`: Print dumped JSON to console.
+- `-o`, `--out`: Output directory (default: data/output/info).
 
 ### 6. Terminal Chat (`#terminal_chat`)
 
@@ -118,6 +124,15 @@ An interactive terminal-based chat client. Note: This module is intended for CLI
 - `Esc`: Exit the current chat or return to the main menu.
 - `/back`: Exit the current chat.
 - `/refresh`: Refresh the current chat history.
+
+### 7. Find Account (`num_to_acc`)
+
+Lookup a Telegram account by phone number.
+
+**Arguments:**
+
+- `inputs` (Required): Phone number(s) to search (including country code) or file path(s).
+- `-o`, `--out`: Output JSON file path.
 
 ## Interactive Mode
 

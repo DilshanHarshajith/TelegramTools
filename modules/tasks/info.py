@@ -26,7 +26,7 @@ def get_args(parser):
     parser.add_argument(
         "users",
         nargs="+",
-        help="Usernames, IDs, or file path containing them."
+        help="Usernames, IDs, phone numbers (starting with +), or file path containing them."
     )
     parser.add_argument(
         "--photos",

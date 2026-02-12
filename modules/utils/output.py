@@ -4,7 +4,7 @@ Output formatting utilities for consistent console output across modules.
 import config
 
 def info(message: str) -> None:
-    """Print info message with [+] prefix."""
+    """Print info message with [*] prefix."""
     print(f"[*] {message}") if config.VERBOSE or config.INFO else None  
 
 def error(message: str) -> None:
@@ -20,6 +20,6 @@ def success(message: str) -> None:
     print(f"[✓] {message}") if config.VERBOSE or config.SUCCESS else None
 
 def progress(message: str) -> None:
-    """Print progress message with [*] prefix."""
+    """Print progress message with [+] prefix."""
     print(f"[+] {message}") if config.VERBOSE or config.PROGRESS else None
 

@@ -34,14 +34,10 @@ def get_args(parser):
         help="Download profile photos."
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Print the dumped data to stdout."
-    )
-    parser.add_argument(
-        "--out",
-        type=str,
-        help="Output directory (default: data/output/info)"
+        "-o", "--out",
+        nargs="?",
+        const="default",
+        help="Output directory (default: data/output/info). If provided, writes global JSON output."
     )
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -141,8 +137,16 @@ async def dump_user_info(client, user_input, args, photos_dir):
 
 async def run(args):
     client = await connect_client()
-    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "info")
-    os.makedirs(module_output, exist_ok=True)
+    
+    # Determine output configuration
+    write_json = args.out is not None
+    if args.out and args.out != "default":
+        module_output = args.out
+    else:
+        module_output = os.path.join(OUTPUT_DIR, "info")
+
+    if write_json or args.photos:
+        os.makedirs(module_output, exist_ok=True)
     
     # Photos directory (shared)
     photos_dir = os.path.join(module_output, "photos")
@@ -186,25 +190,18 @@ async def run(args):
 
     # Save aggregated JSON
     if results:
-        json_path = os.path.join(module_output, "users.json")
-        try:
-            # Load existing if present to append? The user said "save all data to a single json file".
-            # Usually implies overwriting or merging. I'll overwrite for this run, 
-            # OR better: read existing, update, save back to support incremental runs.
-            # But for simplicity and clean "dump" behavior, I'll allow overwrite.
-            # actually, let's try to merge if it exists? 
-            # No, standard dump behavior is usually snapshot of current run.
-            
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(results, f, indent=4, cls=DateTimeEncoder, ensure_ascii=False)
-            
-            success(f"Saved data for {len(results)} users to {json_path}")
-            
-            if args.verbose:
-                print(json.dumps(results, indent=4, cls=DateTimeEncoder, ensure_ascii=False))
+        if write_json:
+            json_path = os.path.join(module_output, "users.json")
+            try:
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(results, f, indent=4, cls=DateTimeEncoder, ensure_ascii=False)
                 
-        except Exception as e:
-            error(f"Failed to save main JSON file: {e}")
+                success(f"Saved data for {len(results)} users to {json_path}")
+            except Exception as e:
+                error(f"Failed to save main JSON file: {e}")
+        
+        print(json.dumps(results, indent=4, cls=DateTimeEncoder, ensure_ascii=False))
+            
     else:
         warning("No user data collected.")
 

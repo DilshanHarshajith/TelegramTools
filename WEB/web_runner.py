@@ -173,9 +173,20 @@ class ModuleExecutor:
         if not module:
             raise ValueError(f"Module {module_name} not found")
         
-        # Create parser and parse empty args to get defaults
+        # Create parser to inspect actions/defaults
         parser = self.app.get_module_parser(module_name, module)
-        args = parser.parse_args([])
+        
+        # Manually construct Namespace from defaults instead of parsing empty args
+        # This avoids erroring on required arguments which are missing from []
+        args = argparse.Namespace()
+        
+        for action in parser._actions:
+            if action.dest != argparse.SUPPRESS:
+                # Use default value if available
+                # For store_true/false, default is usually False/True
+                # For others, it might be None or a specific value
+                if hasattr(action, 'default'):
+                    setattr(args, action.dest, action.default)
         
         # Get action info for proper type handling
         actions_by_dest = {action.dest: action for action in parser._actions}
@@ -187,7 +198,7 @@ class ModuleExecutor:
                 
                 # Check if this argument expects a list (nargs='+', '*', etc.)
                 if action and action.nargs in ['+', '*']:
-                    # Start with existing list if any
+                    # Start with existing list if any (though default is usually None or [])
                     current_list = getattr(args, key, []) or []
                     if not isinstance(current_list, list):
                         current_list = []
@@ -203,7 +214,15 @@ class ModuleExecutor:
                         new_items = [value]
                     
                     # Extend unique items
-                    current_list.extend(new_items)
+                    # Only extend if we haven't already populated it from previous form field
+                    # (e.g. if form sends multiple values for same key, though normally it sends one list)
+                    # For safety, let's just assign if it was empty default, or append?
+                    # Re-assignment is safer for the "initial load" from form data
+                    if not current_list:
+                         current_list = new_items
+                    else:
+                         current_list.extend(new_items)
+                         
                     setattr(args, key, current_list)
                 else:
                     setattr(args, key, value)

@@ -43,6 +43,11 @@ def get_args(parser):
         action="store_true",
         help="Optional flag to download user photos (default: False)",
     )
+    parser.add_argument(
+        "--out",
+        type=str,
+        help="Output directory (default: data/output/user_mapper)",
+    )
 
 
 async def run(args):
@@ -52,7 +57,7 @@ async def run(args):
         return
 
     client = await connect_client()
-    module_output = os.path.join(OUTPUT_DIR, "user_mapper")
+    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "user_mapper")
     os.makedirs(module_output, exist_ok=True)
     
     # If output is provided, treat it as a filename only (not full path)

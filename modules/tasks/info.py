@@ -38,6 +38,11 @@ def get_args(parser):
         action="store_true",
         help="Print the dumped data to stdout."
     )
+    parser.add_argument(
+        "--out",
+        type=str,
+        help="Output directory (default: data/output/info)"
+    )
 
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder for datetime objects."""
@@ -136,7 +141,7 @@ async def dump_user_info(client, user_input, args, photos_dir):
 
 async def run(args):
     client = await connect_client()
-    module_output = os.path.join(OUTPUT_DIR, "info")
+    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "info")
     os.makedirs(module_output, exist_ok=True)
     
     # Photos directory (shared)

@@ -41,10 +41,15 @@ def get_args(parser):
         action="store_true",
         help="Show usernames next to progress bar(default: False)"
     )
+    parser.add_argument(
+        "--out",
+        type=str,
+        help="Output directory (default: data/output/user_export)"
+    )
 
 async def run(args):
     client = await connect_client()
-    module_output = os.path.join(OUTPUT_DIR, "user_export")
+    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "user_export")
     os.makedirs(module_output, exist_ok=True)
 
     try:

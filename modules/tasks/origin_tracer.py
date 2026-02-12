@@ -47,6 +47,11 @@ def get_args(parser):
         default=1,
         help="Minimum number of forwards required to report a source (for Bulk Mode)"
     )
+    parser.add_argument(
+        "--out",
+        type=str,
+        help="Output directory (default: data/output/origin_tracer)"
+    )
 
 
 # ------------------------
@@ -65,9 +70,10 @@ async def run(args):
     if not groups:
         error("No groups provided. Please specify --groups.")
         await client.disconnect()
+        await client.disconnect()
         return
 
-    module_output = os.path.join(OUTPUT_DIR, "origin_tracer")
+    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "origin_tracer")
     os.makedirs(module_output, exist_ok=True)
 
     try:

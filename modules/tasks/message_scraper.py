@@ -45,6 +45,11 @@ def get_args(parser):
         action="store_true",
         help="Show sender_id and a text snippet for each matching message"
     )
+    parser.add_argument(
+        "--out",
+        type=str,
+        help="Output directory (default: data/output/message_scraper)"
+    )
 
 async def run(args):
     client = await connect_client()
@@ -61,7 +66,7 @@ async def run(args):
         await client.disconnect()
         return
     
-    module_output = os.path.join(OUTPUT_DIR, "message_scraper")
+    module_output = args.out if args.out else os.path.join(OUTPUT_DIR, "message_scraper")
 
     try:
         for group in groups:

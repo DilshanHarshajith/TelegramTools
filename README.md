@@ -10,8 +10,7 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
 - **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
 - **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
 - **Info Dumper**: Deep dive into user profiles, status, and history (JSON dump + photos).
-- **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore, `#` to hide from Web UI).
-- **Web Interface**: A modern, responsive web UI for managing and running tasks.
+- **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore).
 
 ## Installation
 
@@ -34,44 +33,11 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
     - Log in and create a new application to get your `API_ID` and `API_HASH`.
 
 2.  **Set up Credentials**:
-    - **Web UI (Recommended)**: Start the web server and use the built-in setup page to enter your credentials.
-    - **Manual**: Create a `.env` file in the project root and add:
+    - Create a `.env` file in the project root and add:
       ```env
       API_ID=12345678
       API_HASH=your_api_hash_here
       ```
-
-## Web Interface
-
-A modern, responsive web interface for TelegramTools built with Flask.
-
-### Features
-
-- 🎨 **Modern UI** - Beautiful glassmorphism design with smooth animations
-- 📱 **Responsive** - Works on desktop, tablet, and mobile devices
-- ⚡ **Real-time Progress** - Live updates during module execution via Server-Sent Events
-- 🔧 **Dynamic Forms** - Auto-generated forms based on module arguments
-- 📊 **Results Display** - Clear visualization of execution results and outputs
-- 📂 **Data Browser** - Browse and download results directly from the UI
-
-### Quick Start
-
-Run the web server:
-
-```bash
-python WEB/app.py
-```
-
-The web interface will be available at: **http://localhost:5000**
-
-### Usage
-
-1. Open your browser and navigate to `http://localhost:5000`
-2. If it's your first time, you'll be redirected to the **Setup** page to enter your API credentials.
-3. Select a module from the dashboard.
-4. Fill in the required parameters (forms are auto-generated).
-5. Click "Run Module" and monitor real-time progress.
-6. View results and download output files via the results page or the **Data Browser**.
 
 ## CLI Usage
 
@@ -142,7 +108,7 @@ Dump comprehensive user information and download profile photos.
 
 ### 6. Terminal Chat (`#terminal_chat`)
 
-An interactive terminal-based chat client. Note: This module is intended for CLI use only and is hidden from the Web UI.
+An interactive terminal-based chat client. Note: This module is intended for CLI use only.
 
 **Arguments:**
 
@@ -170,10 +136,6 @@ This mode provides a menu-driven interface to select and configure modules. For 
 - `modules/`:
   - `modules/tasks/`: Individual task modules (`message_scraper.py`, `user_export.py`, `origin_tracer.py`, etc.).
   - `modules/utils/`: Shared utilities (auth, output, group handling).
-- `WEB/`: Flask Web UI.
-  - `WEB/app.py`: Web interface entry point.
-  - `WEB/web_runner.py`: Backend integration for Web UI.
-  - `WEB/templates/`: HTML templates.
-  - `WEB/static/`: CSS and JS assets.
+
 - `data/`: Default directory for inputs and outputs.
   - `data/output/`: Generated results (JSONs, CSVs, downloads).

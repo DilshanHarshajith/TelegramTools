@@ -11,17 +11,17 @@ import asyncio
 from telethon.tl.types import User
 from modules.utils.auth import connect_client
 from modules.utils.output import info, error, warning, success, progress
-from modules.utils.csv_utils import read_existing_user_ids, write_user_to_csv, parse_user_ids_from_csv
+from modules.utils.csv_utils import read_existing_user_ids, write_user_to_csv
 from modules.utils.photo_utils import download_photos_batch, format_download_stats
-from modules.utils.user_utils import parse_user_inputs, fetch_full_user, resolve_user_from_string
+from modules.utils.user_utils import fetch_full_user
 from config import OUTPUT_DIR
 from tqdm.asyncio import tqdm_asyncio
 from tqdm import tqdm
 
 def get_args(parser):
     parser.add_argument(
-        "--groups",
-        nargs="*",
+        "groups",
+        nargs="+",
         help="Telegram group links or a file containing groups"
     )
     parser.add_argument(
@@ -41,11 +41,6 @@ def get_args(parser):
         action="store_true",
         help="Show usernames next to progress bar(default: False)"
     )
-    parser.add_argument(
-        "--users",
-        type=str,
-        help="User IDs source: either a txt/csv file path (like the exported CSV) or a quoted, comma-separated list of user IDs. When provided, message scanning is skipped."
-    )
 
 async def run(args):
     client = await connect_client()
@@ -53,18 +48,9 @@ async def run(args):
     os.makedirs(module_output, exist_ok=True)
 
     try:
-        if args.users:
-            # Mode: Download photos for specific users (no scanning)
-            args.download_photos = True
-            await handle_users_mode(client, args.users, args, module_output)
-        else:
-            # Mode: Scan messages from groups
-            if not args.groups:
-                error("Either --groups or --users must be provided")
-                return
-            
-            for group in args.groups:
-                await scan_group_messages(client, group, args, module_output)
+        # Mode: Scan messages from groups
+        for group in args.groups:
+            await scan_group_messages(client, group, args, module_output)
 
     except KeyboardInterrupt:
         error("\nUser interrupted, stopping...")
@@ -75,42 +61,7 @@ async def run(args):
             warning(f"Error disconnecting client: {e}")
 
 
-async def handle_users_mode(client, users_arg, args, module_output):
-    """
-    Handle the flow when --users is provided (file or inline).
-    """
-    user_ids = []
-    output_dir = ""
 
-    if os.path.isfile(users_arg):
-        # Case 1: File input (CSV/TXT)
-        info(f"Reading user IDs from file: {users_arg}")
-        user_ids = parse_user_ids_from_csv(users_arg)
-        
-        # Determine output directory based on file location/name
-        csv_dir = os.path.dirname(users_arg)
-        # If the file is in a subdirectory of our module output, preserve that structure
-        # Otherwise use the filename
-        if csv_dir and os.path.commonpath([csv_dir, module_output]) == module_output and csv_dir != module_output:
-             # It's already inside module_output, use that dir
-             output_dir = csv_dir
-        else:
-            # Use filename as folder name
-            basename = os.path.splitext(os.path.basename(users_arg))[0]
-            output_dir = os.path.join(module_output, basename)
-            
-    else:
-        # Case 2: Inline string
-        user_ids = parse_user_inputs(users_arg)
-        output_dir = os.path.join(module_output, "manual_users")
-
-    if not user_ids:
-        error("No valid user IDs found in --users argument")
-        return
-
-    progress(f"Found {len(user_ids)} unique user IDs")
-    os.makedirs(output_dir, exist_ok=True)
-    await process_photo_downloads(client, user_ids, output_dir, args)
 
 
 async def resolve_message_sender(client, msg, verbose=False):
@@ -208,51 +159,23 @@ async def scan_group_messages(client, group, args, module_output):
              await process_photo_downloads(client, new_users, output_dir, args)
 
 
-async def process_photo_downloads(client, users_or_ids, output_dir, args):
+async def process_photo_downloads(client, users, output_dir, args):
     """
-    Download photos for a list of Users or user IDs.
+    Download photos for a list of Users.
     """
     if not args.download_photos:
         warning("--no-photos set, skipping photo download")
         return
 
-    users_to_download = []
-    
-    # Check if input is list of IDs (strings/ints) or User objects
-    first_item = users_or_ids[0] if users_or_ids else None
-    
-    if isinstance(first_item, (str, int)):
-        # Need to fetch entities first
-        progress(f"Fetching entities for {len(users_or_ids)} users...")
-        fetch_failed = 0
-        for user_input in tqdm(users_or_ids, desc="Fetching entities"):
-            try:
-                # Use robust resolver instead of direct get_entity(int())
-                user = await resolve_user_from_string(client, str(user_input))
-                if user:
-                    users_to_download.append(user)
-                else:
-                    fetch_failed += 1
-            except Exception as e:
-                if args.verbose:
-                    error(f"Failed to fetch user {user_input}: {e}")
-                fetch_failed += 1
-                
-        if fetch_failed > 0:
-            warning(f"Failed to resolve {fetch_failed} inputs")
-    else:
-        # Already User objects
-        users_to_download = users_or_ids
-
-    if not users_to_download:
+    if not users:
         warning("No valid users to download photos for.")
         return
 
-    info(f"Starting download for {len(users_to_download)} users...")
+    info(f"Starting download for {len(users)} users...")
     
     successful, skipped, no_photo, failed = await download_photos_batch(
         client, 
-        tqdm(users_to_download, desc="Downloading photos"), 
+        tqdm(users, desc="Downloading photos"), 
         output_dir, 
         verbose=args.verbose
     )

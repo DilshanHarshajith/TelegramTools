@@ -39,6 +39,11 @@ def get_args(parser):
         const="default",
         help="Output directory (default: data/output/info). If provided, writes global JSON output."
     )
+    parser.add_argument(
+        "-f", "--filter",
+        nargs="+",
+        help="Filter output fields (e.g. id, username, first_name)."
+    )
 
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder for datetime objects."""
@@ -52,7 +57,8 @@ class DateTimeEncoder(json.JSONEncoder):
 async def dump_user_info(client, user_input, args, photos_dir):
     """
     Fetches info for a single user and downloads photos if requested.
-    Returns the user data dictionary or None if failed.
+    Fetches info for a single user and downloads photos if requested.
+    Returns a tuple (user_id, data_dict) or None if failed.
     """
     info(f"Resolving user: {user_input}...")
     
@@ -166,7 +172,18 @@ async def dump_user_info(client, user_input, args, photos_dir):
         except Exception as e:
             error(f"Error downloading photos: {e}")
 
-    return data
+    # 5. Apply Filter
+    if args.filter:
+        filter_keys = set()
+        for f in args.filter:
+            for key in f.split(','):
+                clean_key = key.strip()
+                if clean_key:
+                    filter_keys.add(clean_key)
+        
+        data = {k: v for k, v in data.items() if k in filter_keys}
+
+    return target_user.id, data
 
 
 async def run(args):
@@ -218,9 +235,10 @@ async def run(args):
     results = {}
 
     for user_input in unique_inputs:
-        user_data = await dump_user_info(client, user_input, args, photos_dir)
-        if user_data:
-            results[str(user_data["id"])] = user_data
+        result = await dump_user_info(client, user_input, args, photos_dir)
+        if result:
+            user_id, user_data = result
+            results[str(user_id)] = user_data
 
     # Save aggregated JSON
     if results:

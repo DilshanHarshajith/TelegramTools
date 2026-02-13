@@ -111,6 +111,7 @@ Dump comprehensive user information and download profile photos.
 - `users` (Required): Usernames, IDs, Phone numbers (starting with +), or file path containing them.
 - `--photos`: Download all profile photos.
 - `-o`, `--out`: Output directory (default: data/output/info).
+- `-f`, `--filter`: Filter output by JSON key (e.g., `status`, `common_chats_count`).
 
 ### 6. Terminal Chat (`#terminal_chat`)
 

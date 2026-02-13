@@ -17,7 +17,7 @@ if __name__ == "__main__":
 from modules.utils.auth import connect_client
 from modules.utils.output import info, error, warning, success
 from modules.utils.user_utils import parse_user_inputs, resolve_user_from_string
-from config import OUTPUT_DIR
+from config import OUTPUT_DIR, DEFAULT_LIMIT
 
 def get_args(parser):
     """
@@ -108,8 +108,42 @@ async def dump_user_info(client, user_input, args, photos_dir):
         "about": user_full.about,
         "common_chats_count": user_full.common_chats_count,
         "pinned_msg_id": user_full.pinned_msg_id,
-        "photos_downloaded": 0
+        "photos_downloaded": 0,
+        "common_chats": []
     }
+
+    # 3.5 Fetch Common Chats
+    if user_full.common_chats_count > 0:
+        try:
+            # Fetch common chats
+            result = await client(functions.messages.GetCommonChatsRequest(
+                user_id=target_user,
+                max_id=0,
+                limit=DEFAULT_LIMIT
+            ))
+            
+            common_chats_list = []
+            for chat in result.chats:
+                chat_info = {
+                    "id": chat.id,
+                    "title": chat.title,
+                    "username": getattr(chat, 'username', None),
+                    "type": type(chat).__name__
+                }
+                
+                if chat_info['username']:
+                    chat_info['link'] = f"https://t.me/{chat_info['username']}"
+                else:
+                    # For private groups/channels without username, we might not have a link readily available 
+                    # unless we are admin or use export invite link, which is too intrusive.
+                    chat_info['link'] = None
+                    
+                common_chats_list.append(chat_info)
+                
+            data["common_chats"] = common_chats_list
+            
+        except Exception as e:
+            error(f"Failed to fetch common chats for {user_input}: {e}")
 
     # 4. Download Photos
     if args.photos:

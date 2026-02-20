@@ -7,10 +7,8 @@ A comprehensive toolkit for Telegram automation, data scraping, and analysis usi
 - **Message Scraper**: Search and export messages from groups based on keywords, with options to include replies and filter by user. Now supports multiple keywords.
 - **Terminal Chat**: Interactive terminal-based chat client with recent chat list, message history, and search functionality. (CLI Only)
 - **User Export**: Scrape user members from groups and download high-quality profile photos.
-- **User Mapper**: Bulk resolve usernames to user IDs and detailed entity information.
 - **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
 - **Info Dumper**: Deep dive into user profiles, status, and history (JSON dump + photos).
-- **Find Account**: Lookup Telegram account details by phone number.
 - **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore).
 
 ## Installation
@@ -78,18 +76,6 @@ Extract user lists from groups and download profile photos.
 - `-v`, `--verbose`: Show usernames during scan.
 - `--out`: Output directory.
 
-### 3. User Mapper (`user_mapper`)
-
-Resolve a list of usernames or IDs to their full Telegram entity details.
-
-**Arguments:**
-
-- `--inputs`: List of usernames/IDs to resolve.
-- `--file`: File containing one username/ID per line.
-- `--output`: Custom filename for the CSV output.
-- `--photo`: Download user photos.
-- `--out`: Output directory.
-
 ### 4. Origin Tracer (`origin_tracer`)
 
 Trace the original source of forwarded messages.
@@ -125,15 +111,6 @@ An interactive terminal-based chat client. Note: This module is intended for CLI
 - `Esc`: Exit the current chat or return to the main menu.
 - `/back`: Exit the current chat.
 - `/refresh`: Refresh the current chat history.
-
-### 7. Find Account (`num_to_acc`)
-
-Lookup a Telegram account by phone number.
-
-**Arguments:**
-
-- `inputs` (Required): Phone number(s) to search (including country code) or file path(s).
-- `-o`, `--out`: Output JSON file path.
 
 ## Interactive Mode
 

@@ -2,5 +2,3 @@ python-dotenv==1.2.1
 rich==14.2.0
 telethon==1.42.0
 tqdm==4.67.1
-Flask==3.0.0
-flask-cors==4.0.0

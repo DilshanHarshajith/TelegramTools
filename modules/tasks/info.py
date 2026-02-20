@@ -57,7 +57,6 @@ class DateTimeEncoder(json.JSONEncoder):
 async def dump_user_info(client, user_input, args, photos_dir):
     """
     Fetches info for a single user and downloads photos if requested.
-    Fetches info for a single user and downloads photos if requested.
     Returns a tuple (user_id, data_dict) or None if failed.
     """
     info(f"Resolving user: {user_input}...")

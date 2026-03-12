@@ -123,7 +123,7 @@ def log_clear():
     if IS_MAIN:
         console.clear()
 
-MODULES_DIR = "modules/tasks"
+MODULES_DIR = "modules/"
 
 class TelegramToolsApp:
     def __init__(self):

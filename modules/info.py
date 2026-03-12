@@ -17,8 +17,21 @@ from telethon import TelegramClient
 from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError, PeerIdInvalidError
 from telethon.tl.types import InputPhoneContact
 from telethon.tl.functions import contacts as contacts_functions
-import config as _cfg
-from config import API_ID, API_HASH, SESSION_NAME, DEFAULT_LIMIT
+try:
+    import config as _cfg
+except ImportError:
+    class _cfg:
+        API_ID = os.getenv("API_ID")
+        API_HASH = os.getenv("API_HASH")
+        SESSION_NAME = "session"
+        VERBOSE = True; INFO = True; SUCCESS = True; PROGRESS = True
+        WARNING = False; ERROR = False
+        DEFAULT_LIMIT = 1000
+
+API_ID = _cfg.API_ID
+API_HASH = _cfg.API_HASH
+SESSION_NAME = _cfg.SESSION_NAME
+DEFAULT_LIMIT = _cfg.DEFAULT_LIMIT
 
 def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
 def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None

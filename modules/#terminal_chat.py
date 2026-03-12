@@ -26,7 +26,17 @@ from rich.live import Live
 from rich.text import Text
 from rich.align import Align
 
-from config import API_ID, API_HASH, SESSION_NAME
+try:
+    import config as _cfg
+except ImportError:
+    class _cfg:
+        API_ID = os.getenv("API_ID")
+        API_HASH = os.getenv("API_HASH")
+        SESSION_NAME = "session"
+
+API_ID = _cfg.API_ID
+API_HASH = _cfg.API_HASH
+SESSION_NAME = _cfg.SESSION_NAME
 
 def get_client():
     return TelegramClient(SESSION_NAME, API_ID, API_HASH)

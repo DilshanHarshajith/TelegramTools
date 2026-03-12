@@ -17,7 +17,19 @@ from rich.prompt import Prompt, IntPrompt
 from rich.logging import RichHandler
 from rich.text import Text
 
-import config
+try:
+    import config
+except ImportError:
+    class config:
+        API_ID = os.getenv("API_ID")
+        API_HASH = os.getenv("API_HASH")
+        SESSION_NAME = "session"
+        VERBOSE = True; INFO = True; SUCCESS = True; PROGRESS = True
+        WARNING = False; ERROR = False
+        GROUP_FILE = "data/groups.txt"
+        DISCOVER_IGNORE = ['!']
+        WEB_IGNORE = ['#']
+        FILE_PATH_PATTERNS = []
 
 class output_mod:
     @staticmethod

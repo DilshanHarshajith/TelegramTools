@@ -22,8 +22,20 @@ if __name__ == "__main__":
         sys.path.insert(0, project_root)
 from telethon import TelegramClient
 from telethon.tl.types import User  # or other types your module needs
-import config as _cfg
-from config import API_ID, API_HASH, SESSION_NAME
+try:
+    import config as _cfg
+except ImportError:
+    class _cfg:
+        API_ID = os.getenv("API_ID")
+        API_HASH = os.getenv("API_HASH")
+        SESSION_NAME = "session"
+        VERBOSE = True; INFO = True; SUCCESS = True; PROGRESS = True
+        WARNING = False; ERROR = False
+        GROUP_FILE = "data/groups.txt"
+
+API_ID = _cfg.API_ID
+API_HASH = _cfg.API_HASH
+SESSION_NAME = _cfg.SESSION_NAME
 
 def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
 def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None
@@ -45,8 +57,7 @@ async def connect_client():
         raise
 
 def read_groups_from_file(file_path=None):
-    from config import GROUP_FILE
-    path = file_path or GROUP_FILE
+    path = file_path or _cfg.GROUP_FILE
     if not os.path.isfile(path):
         return []
     with open(path, "r", encoding="utf-8") as f:

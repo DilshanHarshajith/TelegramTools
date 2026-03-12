@@ -199,17 +199,40 @@ def get_media_type(msg) -> Optional[str]:
     return None
 
 
+def _safe_file_id(msg) -> Optional[str]:
+    """
+    Return a string file ID for dedup/naming purposes.
+    Falls back to the message ID string if Telethon's file.id raises
+    AttributeError (e.g. PhotoSize objects without a .location in newer
+    Telethon versions).
+    """
+    try:
+        fid = msg.file.id
+        if fid is not None:
+            return str(fid)
+    except AttributeError:
+        pass
+    return str(msg.id)
+
+
 def get_dest_path(msg, chat_dir: str) -> Optional[str]:
     """
     Deterministic path: {msg_id}_{file_id}{ext}
-    - msg_id  : message ID (human-readable order)
-    - file_id : Telegram file ID (stable across forwards/reposts)
+    Falls back to {msg_id} alone when file_id cannot be resolved.
     """
     f = msg.file
-    if not f or not f.id:
+    if not f:
         return None
+    try:
+        file_id = f.id
+        if file_id is None:
+            return None
+        name = f"{msg.id}_{file_id}"
+    except AttributeError:
+        # f.id raises on certain PhotoSize objects that lack .location
+        name = str(msg.id)
     ext = f.ext or ""
-    return os.path.join(chat_dir, f"{msg.id}_{f.id}{ext}")
+    return os.path.join(chat_dir, f"{name}{ext}")
 
 
 def normalise_group(group_str: str):
@@ -306,7 +329,7 @@ async def _download_one(client, msg, dest, sem, pbar, stats):
             file_path = await client.download_media(msg, file=dest)
             if file_path:
                 stats["downloaded"] += 1
-                stats["seen"].add(str(msg.file.id))
+                stats["seen"].add(_safe_file_id(msg))
         except Exception as e:
             stats["failed"] += 1
             warning(f"Failed msg {msg.id}: {e}")
@@ -372,7 +395,7 @@ async def download_media_from_chat(client, entity, group_str, args, output_dir):
             if dest is None:
                 continue
 
-            file_id = str(msg.file.id)
+            file_id = _safe_file_id(msg)
             if file_id in seen:
                 continue
 

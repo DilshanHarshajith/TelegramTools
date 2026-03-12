@@ -22,12 +22,17 @@ if __name__ == "__main__":
 
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telethon.errors import UserAlreadyParticipantError
+from telethon.tl.functions.account import UpdateNotifySettingsRequest
+from telethon.tl.functions.folders import EditPeerFoldersRequest
 from telethon.tl.types import (
+    InputNotifyPeer,
+    InputPeerNotifySettings,
+    InputFolderPeer,
     MessageMediaDocument, MessageMediaPhoto,
     DocumentAttributeVideo, DocumentAttributeAudio,
     DocumentAttributeAnimated, DocumentAttributeSticker,
 )
+from telethon.errors import UserAlreadyParticipantError
 from tqdm import tqdm
 
 from telethon import TelegramClient
@@ -144,6 +149,15 @@ def get_args(parser):
         "--reverse",
         action="store_true",
         help="Scan from oldest messages first.",
+    )
+    parser.add_argument(
+        "--hide-group",
+        action="store_true",
+        help=(
+            "Mute and archive any channel/group that was joined by this tool "
+            "while the tool is running. Has no effect on groups you were "
+            "already a member of."
+        ),
     )
 
 
@@ -318,6 +332,40 @@ async def leave_chat(client, entity, group_str):
         warning(f"Could not leave {group_str}: {e}")
 
 
+async def mute_and_archive_chat(client, entity, group_str):
+    """
+    Mute all notifications and move the chat to the Archive folder (folder_id=1).
+
+    Both operations are best-effort: a warning is printed on failure but
+    execution continues normally.
+    """
+    # --- Mute ---
+    try:
+        input_peer = await client.get_input_entity(entity)
+        await client(UpdateNotifySettingsRequest(
+            peer=InputNotifyPeer(input_peer),
+            settings=InputPeerNotifySettings(
+                mute_until=2 ** 31 - 1,   # muted "forever" (year 2038)
+                show_previews=False,
+            ),
+        ))
+        info(f"Muted notifications for {group_str}.")
+    except Exception as e:
+        warning(f"Could not mute {group_str}: {e}")
+
+    # --- Archive (move to folder 1) ---
+    try:
+        input_peer = await client.get_input_entity(entity)
+        await client(EditPeerFoldersRequest(
+            folder_peers=[
+                InputFolderPeer(peer=input_peer, folder_id=1)
+            ]
+        ))
+        info(f"Archived {group_str}.")
+    except Exception as e:
+        warning(f"Could not archive {group_str}: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Download logic
 # ---------------------------------------------------------------------------
@@ -456,6 +504,12 @@ async def scrape_media(client, group, args, module_output):
     if not entity:
         error(f"Skipping {group} — could not resolve or join.")
         return
+
+    # Mute + archive immediately after joining so the chat stays hidden
+    # for the entire duration of the download run.
+    hide_group = getattr(args, "hide_group", False)
+    if joined_by_tool and hide_group:
+        await mute_and_archive_chat(client, entity, group)
 
     try:
         await download_media_from_chat(client, entity, group, args, module_output)

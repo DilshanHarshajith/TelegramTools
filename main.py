@@ -10,8 +10,6 @@ import logging
 import re
 from typing import Dict, Any, Optional
 
-import modules.utils.output as output_mod
-
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -19,8 +17,26 @@ from rich.prompt import Prompt, IntPrompt
 from rich.logging import RichHandler
 from rich.text import Text
 
-from modules.utils.group_utils import read_groups_from_file
 import config
+
+class output_mod:
+    @staticmethod
+    def info(msg): print(f"[*] {msg}") if config.VERBOSE or config.INFO else None
+    @staticmethod
+    def error(msg): print(f"[!] {msg}") if config.VERBOSE or config.ERROR else None
+    @staticmethod
+    def warning(msg): print(f"[!] {msg}") if config.VERBOSE or config.WARNING else None
+    @staticmethod
+    def success(msg): print(f"[✓] {msg}") if config.VERBOSE or config.SUCCESS else None
+    @staticmethod
+    def progress(msg): print(f"[+] {msg}") if config.VERBOSE or config.PROGRESS else None
+
+def read_groups_from_file(file_path=None):
+    path = file_path or config.GROUP_FILE
+    if not os.path.isfile(path):
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
 
 # Determine if running as main
 IS_MAIN = __name__ == "__main__"

@@ -8,13 +8,135 @@ if __name__ == "__main__":
         sys.path.insert(0, project_root)
 
 import asyncio
-from telethon.tl.types import User
-from modules.utils.auth import connect_client
-from modules.utils.output import info, error, warning, success, progress
-from modules.utils.csv_utils import read_existing_user_ids, write_user_to_csv
-from modules.utils.photo_utils import download_photos_batch, format_download_stats
-from modules.utils.user_utils import fetch_full_user
-from config import OUTPUT_DIR
+import csv
+from telethon.tl.types import User, PeerUser
+from telethon import TelegramClient
+from telethon.errors import FloodWaitError
+import config as _cfg
+from config import API_ID, API_HASH, SESSION_NAME
+
+def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
+def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None
+def warning(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.WARNING else None
+def success(message): print(f"[✓] {message}") if _cfg.VERBOSE or _cfg.SUCCESS else None
+def progress(message): print(f"[+] {message}") if _cfg.VERBOSE or _cfg.PROGRESS else None
+
+def get_client():
+    return TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+async def connect_client():
+    client = get_client()
+    try:
+        await client.start()
+        info("Connected to Telegram API")
+        return client
+    except Exception as e:
+        error(f"Failed to connect to Telegram API: {e}")
+        raise
+
+def read_existing_user_ids(csv_path):
+    existing_uids = set()
+    if not os.path.isfile(csv_path):
+        return existing_uids
+    try:
+        with open(csv_path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if "user_id" in row:
+                    existing_uids.add(row["user_id"])
+    except (csv.Error, KeyError, OSError) as e:
+        warning(f"Could not read existing CSV file: {e}")
+        warning("Starting with empty user list")
+    return existing_uids
+
+def write_user_to_csv(csv_path, user_id, username, first_name, last_name, file_exists=False):
+    with open(csv_path, "a", newline="", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        if not file_exists:
+            writer.writerow(["user_id", "username", "first_name", "last_name"])
+        writer.writerow([str(user_id), username or "", first_name or "", last_name or ""])
+
+async def download_user_photo(client, user, output_dir, user_id=None, verbose=False):
+    if not isinstance(user, User):
+        if verbose:
+            error(f"Skipping non-User entity: {type(user).__name__}")
+        return False, "not_user"
+    if not user.photo:
+        if verbose:
+            progress(f"User {user.id} has no profile photo")
+        return False, "no_photo"
+    user_id = user_id or str(user.id)
+    filename = os.path.join(output_dir, f"{user_id}.jpg")
+    if os.path.isfile(filename):
+        if verbose:
+            progress(f"Skipping {user_id}: file already exists")
+        return False, "skipped_exists"
+    try:
+        await client.download_profile_photo(user, file=filename)
+        if verbose:
+            username = getattr(user, 'username', None) or user_id
+            success(f"Downloaded: {username}")
+        return True, "success"
+    except FloodWaitError as e:
+        warning(f"Flood wait {e.seconds}s. Waiting...")
+        await asyncio.sleep(e.seconds)
+        try:
+            await client.download_profile_photo(user, file=filename)
+            if verbose:
+                username = getattr(user, 'username', None) or user_id
+                success(f"Downloaded: {username}")
+            return True, "success"
+        except Exception as retry_e:
+            if verbose:
+                error(f"Failed to download photo for {user_id} after retry: {retry_e}")
+            return False, "failed"
+    except Exception as e:
+        if verbose:
+            error(f"Failed to download photo for {user_id}: {e}")
+        return False, "failed"
+
+async def download_photos_batch(client, users, output_dir, verbose=False):
+    successful = 0
+    skipped = 0
+    no_photo = 0
+    failed = 0
+    for user in users:
+        success_flag, status = await download_user_photo(client, user, output_dir, verbose=verbose)
+        if success_flag:
+            successful += 1
+        elif status == "skipped_exists":
+            skipped += 1
+        elif status == "no_photo":
+            no_photo += 1
+        else:
+            failed += 1
+    return successful, skipped, no_photo, failed
+
+def format_download_stats(successful, skipped, no_photo, failed):
+    parts = [f"{successful} downloaded"]
+    if skipped > 0:
+        parts.append(f"{skipped} skipped (already exist)")
+    if no_photo > 0:
+        parts.append(f"{no_photo} no photo")
+    if failed > 0:
+        parts.append(f"{failed} failed")
+    return ", ".join(parts)
+
+async def fetch_full_user(client, user_or_id):
+    try:
+        if isinstance(user_or_id, int):
+            user = await client.get_entity(user_or_id)
+        elif isinstance(user_or_id, PeerUser):
+            user = await client.get_entity(user_or_id)
+        else:
+            user = await client.get_entity(user_or_id.id)
+        if isinstance(user, User):
+            return user
+    except Exception:
+        pass
+    return None
+
+OUTPUT_DIR = os.getcwd()
 from tqdm.asyncio import tqdm_asyncio
 from tqdm import tqdm
 
@@ -201,4 +323,3 @@ if __name__ == "__main__":
         asyncio.run(run(args))
     except KeyboardInterrupt:
         pass
-

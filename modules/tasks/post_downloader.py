@@ -22,9 +22,30 @@ from telethon.tl.functions.stories import (
     GetStoriesArchiveRequest,
 )
 
-from modules.utils.auth import connect_client
-from modules.utils.output import info, error, success, warning, progress
-from config import OUTPUT_DIR
+from telethon import TelegramClient
+import config as _cfg
+from config import API_ID, API_HASH, SESSION_NAME
+
+def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
+def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None
+def warning(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.WARNING else None
+def success(message): print(f"[✓] {message}") if _cfg.VERBOSE or _cfg.SUCCESS else None
+def progress(message): print(f"[+] {message}") if _cfg.VERBOSE or _cfg.PROGRESS else None
+
+def get_client():
+    return TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+async def connect_client():
+    client = get_client()
+    try:
+        await client.start()
+        info("Connected to Telegram API")
+        return client
+    except Exception as e:
+        error(f"Failed to connect to Telegram API: {e}")
+        raise
+
+OUTPUT_DIR = os.getcwd()
 
 
 # ---------------------------------------------------------------------------

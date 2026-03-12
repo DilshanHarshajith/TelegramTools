@@ -26,8 +26,17 @@ from rich.live import Live
 from rich.text import Text
 from rich.align import Align
 
-from modules.utils.auth import connect_client
-from config import OUTPUT_DIR
+from config import API_ID, API_HASH, SESSION_NAME
+
+def get_client():
+    return TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+async def connect_client():
+    client = get_client()
+    await client.start()
+    return client
+
+OUTPUT_DIR = os.getcwd()
 
 console = Console()
 

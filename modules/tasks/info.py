@@ -1,4 +1,3 @@
-
 import os
 import sys
 import json
@@ -14,10 +13,100 @@ if __name__ == "__main__":
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-from modules.utils.auth import connect_client
-from modules.utils.output import info, error, warning, success
-from modules.utils.user_utils import parse_user_inputs, resolve_user_from_string
-from config import OUTPUT_DIR, DEFAULT_LIMIT
+from telethon import TelegramClient
+from telethon.errors import UsernameInvalidError, UsernameNotOccupiedError, PeerIdInvalidError
+from telethon.tl.types import InputPhoneContact
+from telethon.tl.functions import contacts as contacts_functions
+import config as _cfg
+from config import API_ID, API_HASH, SESSION_NAME, DEFAULT_LIMIT
+
+def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
+def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None
+def warning(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.WARNING else None
+def success(message): print(f"[✓] {message}") if _cfg.VERBOSE or _cfg.SUCCESS else None
+
+def get_client():
+    return TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+async def connect_client():
+    client = get_client()
+    try:
+        await client.start()
+        info("Connected to Telegram API")
+        return client
+    except Exception as e:
+        error(f"Failed to connect to Telegram API: {e}")
+        raise
+
+def parse_user_inputs(input_str):
+    if not input_str:
+        return []
+    raw_parts = input_str.replace(',', ' ').split()
+    collected = []
+    seen = set()
+    for part in raw_parts:
+        normalized = part.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            collected.append(normalized)
+    return collected
+
+async def resolve_phone(client, phone):
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    try:
+        try:
+            entity = await client.get_entity(phone)
+            if isinstance(entity, User):
+                return entity
+        except Exception:
+            pass
+        contact = InputPhoneContact(client_id=0, phone=phone, first_name="TelegramTools", last_name="Search")
+        result = await client(contacts_functions.ImportContactsRequest(contacts=[contact]))
+        if result.users:
+            imported_user = result.users[0]
+            await client(contacts_functions.DeleteContactsRequest(id=[imported_user.id]))
+            try:
+                user = await client.get_entity(imported_user.id)
+                if not user.phone:
+                    user.phone = imported_user.phone
+                return user
+            except Exception:
+                return imported_user
+        else:
+            return None
+    except Exception as e:
+        error(f"Error resolving phone {phone}: {e}")
+        return None
+
+async def resolve_user_from_string(client, value):
+    cleaned = value.strip()
+    if cleaned.startswith("+"):
+        return await resolve_phone(client, cleaned)
+    if cleaned.startswith("@"):
+        cleaned = cleaned[1:]
+    try:
+        entity = await client.get_entity(int(cleaned)) if cleaned.isdigit() else await client.get_entity(cleaned)
+    except UsernameNotOccupiedError:
+        error(f"Username not found: {value}")
+        return None
+    except UsernameInvalidError:
+        error(f"Invalid username: {value}")
+        return None
+    except PeerIdInvalidError:
+        error(f"Invalid user ID: {value}")
+        return None
+    except ValueError:
+        error(f"Could not resolve: {value}")
+        return None
+    except Exception as exc:
+        error(f"Failed to resolve {value}: {exc}")
+        return None
+    if not isinstance(entity, User):
+        warning(f"Resolved entity is not a user: {value} ({type(entity).__name__})")
+        return None
+    return entity
+
+OUTPUT_DIR = os.getcwd()
 
 def get_args(parser):
     """

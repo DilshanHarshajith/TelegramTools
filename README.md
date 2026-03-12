@@ -96,7 +96,7 @@ Dump comprehensive user information and download profile photos.
 
 - `users` (Required): Usernames, IDs, Phone numbers (starting with +), or file path containing them.
 - `--photos`: Download all profile photos.
-- `-o`, `--out`: Output directory (default: data/output/info).
+- `-o`, `--out`: Output directory (default: `./info`).
 - `-f`, `--filter`: Filter output by JSON key (e.g., `status`, `common_chats_count`).
 
 ### 6. Terminal Chat (`#terminal_chat`)
@@ -126,9 +126,6 @@ This mode provides a menu-driven interface to select and configure modules. For 
 
 - `main.py`: CLI entry point.
 - `config.py`: Configuration and environment variable loading.
-- `modules/`:
-  - `modules/tasks/`: Individual task modules (`message_scraper.py`, `user_export.py`, `origin_tracer.py`, etc.).
-  - `modules/utils/`: Shared utilities (auth, output, group handling).
-
+- `modules/`: Individual task modules (`message_scraper.py`, `user_export.py`, `origin_tracer.py`, etc.).
 - `data/`: Default directory for inputs and outputs.
   - `data/output/`: Generated results (JSONs, CSVs, downloads).

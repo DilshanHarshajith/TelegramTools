@@ -1,30 +1,88 @@
 import os
+import argparse
 import sys
-
-# Add project root to sys.path if running as standalone script
-if __name__ == "__main__":
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
 
 import json
 from telethon import TelegramClient
+# ---------------------------------------------------------------------------
+# Path setup — makes config.py importable from anywhere
+# ---------------------------------------------------------------------------
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
 try:
     import config as _cfg
 except ImportError:
+    import getpass
+    from pathlib import Path
+
+    def _load_dotenv(path):
+        vals = {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    vals[key.strip()] = val.strip().strip('"').strip("'")
+        except OSError:
+            pass
+        return vals
+
     class _cfg:
-        API_ID = os.getenv("API_ID")
-        API_HASH = os.getenv("API_HASH")
-        SESSION_NAME = "session"
+        _api_id = _api_hash = None
+        _session = "session"
         VERBOSE = True; INFO = True; SUCCESS = True; PROGRESS = True
         WARNING = False; ERROR = False
+        GROUP_FILE = "groups.txt"
+        DEFAULT_LIMIT = 1000
         REPLY_ITER_LIMIT = 500
 
-API_ID = _cfg.API_ID
-API_HASH = _cfg.API_HASH
-SESSION_NAME = _cfg.SESSION_NAME
-REPLY_ITER_LIMIT = _cfg.REPLY_ITER_LIMIT
+        _here = Path(__file__).resolve().parent
+        for _p in dict.fromkeys([_here / ".env", Path.home() / ".env", Path.cwd() / ".env"]):
+            if _p.is_file():
+                _d = _load_dotenv(_p)
+                _api_id   = _d.get("API_ID")   or _api_id
+                _api_hash = _d.get("API_HASH")  or _api_hash
+                _session  = _d.get("SESSION_NAME", _session)
+                if _api_id and _api_hash:
+                    print(f"[*] Credentials loaded from {_p}")
+                    break
 
+        if not (_api_id and _api_hash):
+            _api_id   = os.getenv("API_ID")   or _api_id
+            _api_hash = os.getenv("API_HASH") or _api_hash
+
+        if not (_api_id and _api_hash):
+            print("\n[!] Telegram API credentials not found.")
+            print("    Get yours at https://my.telegram.org/apps\n")
+            while not _api_id:
+                _raw = input("    API_ID  (numeric): ").strip()
+                if _raw.isdigit():
+                    _api_id = _raw
+                else:
+                    print("    API_ID must be a number — please try again.")
+            while not _api_hash:
+                _raw = getpass.getpass("    API_HASH (hidden): ").strip()
+                if _raw:
+                    _api_hash = _raw
+                else:
+                    print("    API_HASH cannot be empty — please try again.")
+            if input("\n    Save to .env in current directory? [y/N] ").strip().lower() == "y":
+                _env_path = Path.cwd() / ".env"
+                with open(_env_path, "a", encoding="utf-8") as _f:
+                    _f.write(f"\nAPI_ID={_api_id}\nAPI_HASH={_api_hash}\n")
+                print(f"    Saved to {_env_path}\n")
+
+        API_ID       = int(_api_id)
+        API_HASH     = str(_api_hash)
+        SESSION_NAME = _session
+
+API_ID       = _cfg.API_ID
+API_HASH     = _cfg.API_HASH
+SESSION_NAME = _cfg.SESSION_NAME
 def info(message): print(f"[*] {message}") if _cfg.VERBOSE or _cfg.INFO else None
 def error(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.ERROR else None
 def warning(message): print(f"[!] {message}") if _cfg.VERBOSE or _cfg.WARNING else None
@@ -274,10 +332,12 @@ async def collect_replies(client, group, msg) -> dict:
 
 
 if __name__ == "__main__":
-    import argparse
-    import asyncio
     
-    parser = argparse.ArgumentParser(description="Telegram Message Scraper")
+    parser = argparse.ArgumentParser(
+        description="Search and export messages from Telegram groups by keyword or sender.",
+        epilog="Examples:\n  python message_scraper.py --groups @channel -k bitcoin\n  python message_scraper.py --groups @channel -k bitcoin scam --replies\n  python message_scraper.py --groups groups.txt --user @someone\n  python message_scraper.py --groups @channel -k keyword --out ./results",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     get_args(parser)
     args = parser.parse_args()
     

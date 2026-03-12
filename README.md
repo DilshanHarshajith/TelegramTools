@@ -1,131 +1,240 @@
 # TelegramTools
 
-A comprehensive toolkit for Telegram automation, data scraping, and analysis using the Telethon library. This project provides modular tools for scraping messages, exporting user data, resolving usernames, tracing message origins, and analyzing infrastructure overlap between groups.
+A modular toolkit for Telegram automation, data scraping, and analysis built on the Telethon library.
 
 ## Features
 
-- **Message Scraper**: Search and export messages from groups based on keywords, with options to include replies and filter by user. Now supports multiple keywords.
-- **Terminal Chat**: Interactive terminal-based chat client with recent chat list, message history, and search functionality. (CLI Only)
-- **User Export**: Scrape user members from groups and download high-quality profile photos.
-- **Origin Tracer**: Trace the original source of forwarded messages, either for a single message or in bulk across a group.
-- **Info Dumper**: Deep dive into user profiles, status, and history (JSON dump + photos).
-- **Modular Design**: Easy to extend with new task modules. Supports interactive modules and module discovery filtering via prefixes (`!` to ignore).
+- **Media Downloader** — Download photos, videos, audio, documents, voice messages, GIFs, and stickers from channels/groups. Concurrent downloads, resume support, date and type filtering.
+- **Message Scraper** — Search and export messages by keyword or sender, with optional reply context.
+- **User Export** — Extract unique users from group message history and download their profile photos.
+- **Origin Tracer** — Trace the original source of forwarded messages, single or in bulk.
+- **Info Dumper** — Deep-dive user profile dump: status, common chats, photos (JSON output).
+- **Post Downloader** — Download profile stories/posts from a user's profile page.
+- **Terminal Chat** — Interactive terminal-based chat client with chat list, history, and search.
+- **Modular Design** — Every module is fully standalone. Drop any module anywhere and run it directly.
 
 ## Installation
 
-1.  **Clone the repository**:
-
-    ```bash
-    git clone https://github.com/DilshanHarshajith/TelegramTools.git
-    cd TelegramTools
-    ```
-
-2.  **Install dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+git clone https://github.com/DilshanHarshajith/TelegramTools.git
+cd TelegramTools
+pip install -r requirements.txt
+```
 
 ## Configuration
 
-1.  **Obtain API Credentials**:
-    - Go to [my.telegram.org](https://my.telegram.org).
-    - Log in and create a new application to get your `API_ID` and `API_HASH`.
+Get your `API_ID` and `API_HASH` from [my.telegram.org/apps](https://my.telegram.org/apps).
 
-2.  **Set up Credentials**:
-    - Create a `.env` file in the project root and add:
-      ```env
-      API_ID=12345678
-      API_HASH=your_api_hash_here
-      ```
+Credentials are resolved in this order — the first source that provides both wins:
 
-## CLI Usage
+1. `.env` file — searched in the script's directory, then `~/.env`, then the current working directory
+2. Environment variables — `API_ID` and `API_HASH`
+3. Interactive prompt — asked at runtime, with an option to save to `.env`
 
-The toolkit uses a central entry point `main.py`. You can run specific modules using the `-m` flag.
+**Recommended:** create a `.env` file in the project root (or wherever you run from):
 
-### List Available Modules
-
-To see all available task modules:
-
-```bash
-python main.py --list-modules
+```env
+API_ID=12345678
+API_HASH=your_api_hash_here
 ```
 
-### 1. Message Scraper (`message_scraper`)
+`config.py` is optional. If present, all modules use it for credentials and settings. If absent, each module resolves credentials entirely on its own — no other project file is required.
 
-Search for messages containing specific keywords in one or more groups.
+---
 
-**Arguments:**
+## Module Reference
 
-- `-k`, `--keyword`: Keyword(s) to search for. Required unless `--user` is provided.
-- `--groups`: List of group links/usernames or a file containing them.
-- `-l`, `--limit`: Max messages to scan per group (default: 0 = all).
-- `--user`: Filter by sender ID or username. Required unless `--keyword` is provided.
-- `--replies`: Include replies to matching messages in the output.
-- `-v`, `--verbose`: Verbose output (show matching snippets).
-- `--out`: Output directory.
+### media_downloader
 
-### 2. User Export (`user_export`)
+Downloads media from channels and groups.
 
-Extract user lists from groups and download profile photos.
+```
+python media_downloader.py <groups...> [options]
 
-**Arguments:**
+groups                @username, t.me/link, invite link, numeric ID, or file path
 
-- `groups` (Positional): List of group links or a file containing groups.
-- `--no-photos`: Disable downloading profile photos.
-- `--limit`: Max messages to scan for finding users.
-- `-v`, `--verbose`: Show usernames during scan.
-- `--out`: Output directory.
+Type filters (combine freely; default: all):
+  -p, --photo         Photos
+  -v, --video         Videos
+  -d, --document      Documents
+  -a, --audio         Audio files
+  --voice             Voice messages
+  --gif               GIFs / animations
+  --sticker           Stickers
 
-### 4. Origin Tracer (`origin_tracer`)
+Options:
+  -n, --limit N       Max files to download per group (default: 0 = all)
+  -w, --workers N     Concurrent downloads (default: 4)
+  --out DIR           Output directory
+  --dry-run           Scan and count without downloading
+  --no-resume         Re-download everything, ignore existing files
+  --min-date DATE     Only media on or after YYYY-MM-DD [HH:MM:SS]
+  --max-date DATE     Only media on or before YYYY-MM-DD [HH:MM:SS]
+  --reverse           Scan from oldest messages first
+  --hide-group        Mute and archive any group joined by the tool during the run
+```
+
+**Examples:**
+```bash
+python media_downloader.py @channel --video --photo
+python media_downloader.py @channel -n 100 --dry-run
+python media_downloader.py @channel --min-date 2024-01-01 --hide-group
+python media_downloader.py groups.txt --audio --out ./downloads
+```
+
+---
+
+### message_scraper
+
+Search and export messages by keyword or sender.
+
+```
+python message_scraper.py [options]
+
+  --groups            Group links/usernames or a file containing them
+  -k, --keyword       Keyword(s) to match (any match includes the message)
+  --user              Filter by sender ID or @username
+  -l, --limit N       Max messages to scan per group (default: 0 = all)
+  --replies           Include replies to matching messages in output
+  -v, --verbose       Show sender and text snippet per match
+  --out DIR           Output directory
+```
+
+**Examples:**
+```bash
+python message_scraper.py --groups @channel -k bitcoin
+python message_scraper.py --groups @channel -k bitcoin scam --replies
+python message_scraper.py --groups groups.txt --user @someone
+```
+
+---
+
+### user_export
+
+Extract unique users from group message history and download profile photos.
+
+```
+python user_export.py <groups...> [options]
+
+groups                Group links or a file containing groups
+
+  --no-photos         Skip profile photo downloads (photos downloaded by default)
+  --limit N           Max messages to scan per group (default: 0 = all)
+  -v, --verbose       Show usernames during scan
+  --out DIR           Output directory
+```
+
+**Examples:**
+```bash
+python user_export.py @group
+python user_export.py @group --no-photos --limit 500
+python user_export.py groups.txt --out ./results
+```
+
+---
+
+### origin_tracer
 
 Trace the original source of forwarded messages.
 
-**Arguments:**
+```
+python origin_tracer.py [options]
 
-- `--groups`: Telegram group/channel links or usernames to analyze.
-- `--message-id`: Specific Message ID to trace origin for (Single Message Mode).
-- `--limit`: Maximum messages to scan per group (Bulk Mode).
-- `--min-count`: Minimum forwards required to report a source (Bulk Mode).
-- `--out`: Output directory.
-
-### 5. Info Dumper (`info`)
-
-Dump comprehensive user information and download profile photos.
-
-**Arguments:**
-
-- `users` (Required): Usernames, IDs, Phone numbers (starting with +), or file path containing them.
-- `--photos`: Download all profile photos.
-- `-o`, `--out`: Output directory (default: `./info`).
-- `-f`, `--filter`: Filter output by JSON key (e.g., `status`, `common_chats_count`).
-
-### 6. Terminal Chat (`#terminal_chat`)
-
-An interactive terminal-based chat client. Note: This module is intended for CLI use only.
-
-**Arguments:**
-
-- `--limit`: Number of recent chats to display in the list (default: 20).
-- `s`: Search for a contact or group by username, phone number, or Chat ID.
-- `0`: Return to the main menu.
-- `Esc`: Exit the current chat or return to the main menu.
-- `/back`: Exit the current chat.
-- `/refresh`: Refresh the current chat history.
-
-## Interactive Mode
-
-If you run `main.py` without any arguments, it enters an **Interactive Mode**:
-
-```bash
-python main.py
+  --groups            Group/channel links or usernames
+  --message-id N      Trace a single message by ID (single message mode)
+  --limit N           Max messages to scan per group (bulk mode, default: 0 = all)
+  --min-count N       Minimum forwards required to include a source in the report
+  --out DIR           Output directory
 ```
 
-This mode provides a menu-driven interface to select and configure modules. For standard modules, it will prompt you for arguments after selection. For interactive modules like `#terminal_chat`, it will skip the argument prompt and start immediately.
+**Examples:**
+```bash
+python origin_tracer.py --groups @channel
+python origin_tracer.py --groups @channel --message-id 42
+python origin_tracer.py --groups @channel --limit 1000 --min-count 3
+```
+
+---
+
+### info
+
+Dump comprehensive user information to JSON.
+
+```
+python info.py <users...> [options]
+
+users                 Usernames, numeric IDs, phone numbers (+...), or file path
+
+  --photos            Download all profile photos
+  -o, --out DIR       Output directory
+  -f, --filter KEYS   Only include these JSON keys in output
+```
+
+**Examples:**
+```bash
+python info.py @username
+python info.py @username --photos --out ./results
+python info.py users.txt -f id username status common_chats_count
+```
+
+---
+
+### post_downloader
+
+Download profile stories and posts from a user's profile page.
+
+```
+python post_downloader.py <usernames...> [options]
+
+usernames             One or more @usernames
+
+  -w, --workers N     Concurrent downloads (default: 4)
+  --out DIR           Output directory
+  --no-resume         Re-download everything, ignore existing files
+```
+
+**Examples:**
+```bash
+python post_downloader.py @username
+python post_downloader.py @user1 @user2 --out ./stories
+python post_downloader.py @username --no-resume -w 8
+```
+
+---
+
+### #terminal_chat  *(interactive)*
+
+Terminal-based chat client. Run directly — no arguments needed.
+
+```
+python '#terminal_chat.py'
+
+Keybindings:
+  s           Search by username, phone, or chat ID
+  0           Return to main menu
+  Esc         Exit current chat / return to menu
+  /back       Exit current chat
+  /refresh    Refresh chat history
+```
+
+---
 
 ## Project Structure
 
-- `main.py`: CLI entry point.
-- `config.py`: Configuration and environment variable loading.
-- `modules/`: Individual task modules (`message_scraper.py`, `user_export.py`, `origin_tracer.py`, etc.).
-- `data/`: Default directory for inputs and outputs.
-  - `data/output/`: Generated results (JSONs, CSVs, downloads).
+```
+TelegramTools/
+├── config.py              # Central config and credential resolution (optional)
+├── media_downloader.py    # Standalone module
+├── message_scraper.py     # Standalone module
+├── user_export.py         # Standalone module
+├── origin_tracer.py       # Standalone module
+├── info.py                # Standalone module
+├── post_downloader.py     # Standalone module
+├── #terminal_chat.py      # Interactive standalone module
+├── !Module_Template.py    # Template for new modules
+└── data/
+    ├── groups.txt         # Default group list (one per line)
+    └── output/            # Generated results
+```
+
+> **Module prefixes:** `!` = template/excluded from discovery, `#` = interactive module.

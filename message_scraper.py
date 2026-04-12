@@ -1,6 +1,7 @@
 import os
 import argparse
 import sys
+import asyncio
 
 import json
 from telethon import TelegramClient

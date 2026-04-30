@@ -1,7 +1,7 @@
 """
 Media Downloader
 ----------------
-Downloads media files (photos, videos, audio, documents, voice, stickers, GIFs)
+Downloads media files (photos, videos, video messages, audio, documents, voice, stickers, GIFs)
 from Telegram channels and groups. Supports concurrent downloads, resume on
 restart, date filtering, type filtering, and auto join/leave.
 """
@@ -137,7 +137,8 @@ def read_groups_from_file(file_path=None):
 
 OUTPUT_DIR = os.getcwd()
 
-ALL_TYPES = {"photo", "video", "document", "audio", "voice", "gif", "sticker"}
+# "video_message" = circular/round video notes (distinct from regular videos)
+ALL_TYPES = {"photo", "video", "video_message", "document", "audio", "voice", "gif", "sticker"}
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +188,7 @@ def get_args(parser):
     )
     type_group.add_argument("-p", "--photo",    action="store_true", help="Photos")
     type_group.add_argument("-v", "--video",    action="store_true", help="Videos")
+    type_group.add_argument("--video-message",  action="store_true", help="Video messages (round/circular video notes)")
     type_group.add_argument("-d", "--document", action="store_true", help="Documents")
     type_group.add_argument("-a", "--audio",    action="store_true", help="Audio files")
     type_group.add_argument("--voice",          action="store_true", help="Voice messages")
@@ -233,6 +235,7 @@ def build_wanted_types(args) -> set:
             ("voice",    args.voice),
             ("gif",      args.gif),
             ("sticker",  args.sticker),
+            ("video_message", args.video_message),
         ] if flag
     }
     return requested or ALL_TYPES
@@ -264,6 +267,9 @@ def get_media_type(msg) -> Optional[str]:
             if isinstance(attr, DocumentAttributeAnimated):
                 return "gif"
             if isinstance(attr, DocumentAttributeVideo):
+                # round_message=True → circular video note (video message)
+                if getattr(attr, "round_message", False):
+                    return "video_message"
                 return "video"
             if isinstance(attr, DocumentAttributeAudio):
                 return "voice" if getattr(attr, "voice", False) else "audio"
@@ -613,7 +619,14 @@ async def run(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Download media from Telegram channels and groups.",
-        epilog="Examples:\n  python media_downloader.py @channel --video --photo\n  python media_downloader.py @channel -n 100 --dry-run\n  python media_downloader.py @channel --min-date 2024-01-01 --hide-group\n  python media_downloader.py groups.txt --audio --out ./downloads",
+        epilog=(
+            "Examples:\n"
+            "  python media_downloader.py @channel --video --photo\n"
+            "  python media_downloader.py @channel --video-message\n"
+            "  python media_downloader.py @channel -n 100 --dry-run\n"
+            "  python media_downloader.py @channel --min-date 2024-01-01 --hide-group\n"
+            "  python media_downloader.py groups.txt --audio --out ./downloads"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     get_args(parser)

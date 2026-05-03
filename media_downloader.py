@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.tl.functions.messages import ImportChatInviteRequest, CheckChatInviteRequest
 from telethon.tl.functions.account import UpdateNotifySettingsRequest
 from telethon.tl.functions.folders import EditPeerFoldersRequest
 from telethon.tl.types import (
@@ -25,8 +25,14 @@ from telethon.tl.types import (
     MessageMediaDocument, MessageMediaPhoto,
     DocumentAttributeVideo, DocumentAttributeAudio,
     DocumentAttributeAnimated, DocumentAttributeSticker,
+    ChatInviteAlready,
 )
-from telethon.errors import UserAlreadyParticipantError
+from telethon.errors import (
+    UserAlreadyParticipantError,
+    ChannelPrivateError,
+    ChatAdminRequiredError,
+    InviteHashExpiredError,
+)
 from tqdm import tqdm
 
 from telethon import TelegramClient
@@ -349,9 +355,19 @@ def seed_seen_from_disk(chat_dir: str) -> set:
 # Join / Leave
 # ---------------------------------------------------------------------------
 
-async def join_chat(client, group_str):
-    """Join a chat if needed. Returns (entity, joined_by_tool)."""
-    joined_by_tool = False
+async def resolve_entity(client, group_str):
+    """
+    Resolve a chat entity *without* joining it.
+
+    Returns (entity, must_join) where:
+      - entity     : the resolved Telegram entity, or None on failure
+      - must_join  : True only when the link is a private invite hash and
+                     the account is NOT yet a member — the only case where
+                     joining is unavoidable before any content can be read.
+
+    For public channels/groups the caller should always attempt to download
+    first; joining is only a fallback if a ChannelPrivateError is raised.
+    """
     target = normalise_group(group_str)
 
     invite_match = (
@@ -363,28 +379,84 @@ async def join_chat(client, group_str):
         invite_hash = invite_match.group(1)
         info(f"Invite hash detected: {invite_hash}")
         try:
-            updates = await client(ImportChatInviteRequest(invite_hash))
-            joined_by_tool = True
-            success(f"Joined via invite: {group_str}")
-            return updates.chats[0], joined_by_tool
-        except UserAlreadyParticipantError:
-            info(f"Already a participant: {group_str}")
+            result = await client(CheckChatInviteRequest(invite_hash))
+            if isinstance(result, ChatInviteAlready):
+                # Already a member — entity is available, no join needed.
+                info(f"Already a participant (invite link): {group_str}")
+                return result.chat, False
+            else:
+                # ChatInvite — private link, not yet a member.
+                # There is no way to read content without joining.
+                info(f"Private invite — must join to access: {group_str}")
+                return None, True
+        except InviteHashExpiredError:
+            error(f"Invite link has expired: {group_str}")
+            return None, False
         except Exception as e:
-            error(f"Failed to join via invite {group_str}: {e}")
+            error(f"Could not check invite {group_str}: {e}")
             return None, False
 
     try:
         entity = await client.get_entity(target)
         if hasattr(entity, "left") and entity.left:
-            info(f"Not a member of {group_str} — joining...")
-            await client(JoinChannelRequest(entity))
-            joined_by_tool = True
-            success(f"Joined: {group_str}")
+            info(f"Not a member of {group_str} — will attempt access without joining first.")
         else:
             info(f"Already a member of {group_str}.")
-        return entity, joined_by_tool
+        return entity, False
     except Exception as e:
-        error(f"Could not resolve or join {group_str}: {e}")
+        error(f"Could not resolve {group_str}: {e}")
+        return None, False
+
+
+async def _do_join(client, group_str, entity=None):
+    """
+    Unconditionally join a chat.
+
+    Returns (entity, joined_by_tool):
+      - joined_by_tool is True  when this call actually joined the chat.
+      - joined_by_tool is False when the account was already a member.
+      - entity is None on failure.
+    """
+    target = normalise_group(group_str)
+
+    invite_match = (
+        re.search(r"t\.me/(?:\+|joinchat/)([\w-]+)", str(target))
+        if isinstance(target, str) else None
+    )
+
+    if invite_match:
+        invite_hash = invite_match.group(1)
+        try:
+            updates = await client(ImportChatInviteRequest(invite_hash))
+            success(f"Joined via invite: {group_str}")
+            return updates.chats[0], True
+        except UserAlreadyParticipantError:
+            info(f"Already a participant: {group_str}")
+            # Re-check to retrieve the entity.
+            try:
+                result = await client(CheckChatInviteRequest(invite_hash))
+                if isinstance(result, ChatInviteAlready):
+                    return result.chat, False
+            except Exception:
+                pass
+            return entity, False
+        except Exception as e:
+            error(f"Failed to join via invite {group_str}: {e}")
+            return None, False
+
+    try:
+        if entity is None:
+            entity = await client.get_entity(target)
+        await client(JoinChannelRequest(entity))
+        # Re-fetch so entity.left is updated.
+        entity = await client.get_entity(target)
+        success(f"Joined: {group_str}")
+        return entity, True
+    except UserAlreadyParticipantError:
+        info(f"Already a participant: {group_str}")
+        return entity, False
+    except Exception as e:
+        error(f"Could not join {group_str}: {e}")
         return None, False
 
 
@@ -563,22 +635,56 @@ async def download_media_from_chat(client, entity, group_str, args, output_dir):
 
 async def scrape_media(client, group, args, module_output):
     info(f"Processing: {group}")
-    entity, joined_by_tool = await join_chat(client, group)
 
-    if not entity:
-        error(f"Skipping {group} — could not resolve or join.")
+    hide_group = getattr(args, "hide_group", False)
+    joined_by_tool = False
+
+    entity, must_join = await resolve_entity(client, group)
+
+    # ── Case 1: private invite link where we are not yet a member ──────────
+    # No content is accessible without joining, so join immediately.
+    if must_join:
+        entity, joined_by_tool = await _do_join(client, group)
+        if not entity:
+            error(f"Skipping {group} — could not join.")
+            return
+        if hide_group:
+            await mute_and_archive_chat(client, entity, group)
+
+    elif entity is None:
+        error(f"Skipping {group} — could not resolve.")
         return
 
-    # Mute + archive immediately after joining so the chat stays hidden
-    # for the entire duration of the download run.
-    hide_group = getattr(args, "hide_group", False)
-    if joined_by_tool and hide_group:
-        await mute_and_archive_chat(client, entity, group)
-
+    # ── Case 2 & 3: entity resolved — try downloading without joining ──────
+    # Public channels/groups allow iter_messages even when entity.left=True.
+    # If access is denied (ChannelPrivateError / ChatAdminRequiredError) we
+    # fall back to joining exactly once and retrying.
     try:
         await download_media_from_chat(client, entity, group, args, module_output)
+
+    except (ChannelPrivateError, ChatAdminRequiredError) as exc:
+        if joined_by_tool:
+            # Already joined but still blocked — nothing more we can do.
+            error(f"Access denied even after joining {group}: {exc}")
+            return
+
+        info(f"Access requires membership — joining {group}...")
+        entity, joined_by_tool = await _do_join(client, group, entity)
+        if not entity:
+            error(f"Could not join {group}, skipping.")
+            return
+
+        if hide_group:
+            await mute_and_archive_chat(client, entity, group)
+
+        try:
+            await download_media_from_chat(client, entity, group, args, module_output)
+        except KeyboardInterrupt:
+            raise
+
     except KeyboardInterrupt:
         raise
+
     finally:
         if joined_by_tool:
             info(f"Leaving {group} (was joined by tool)...")

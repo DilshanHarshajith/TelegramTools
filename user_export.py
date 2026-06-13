@@ -1,6 +1,7 @@
 import os
 import argparse
 import sys
+import re
 
 import asyncio
 import csv
@@ -300,7 +301,11 @@ async def scan_group_messages(client, group, args, module_output):
     """
     Scan messages in a group to find unique users.
     """
-    group_safe = group.replace('/', '_')
+    s = str(group).strip()
+    s = re.sub(r'^(https?://)?(t\.me|telegram\.me|telegram\.dog)/', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^(joinchat/|\+)', '', s)
+    s = re.sub(r'^@', '', s)
+    group_safe = re.sub(r'[/\\:*?"<>|]', "_", s)
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
     

@@ -2,6 +2,7 @@ import os
 import argparse
 import sys
 import asyncio
+import re
 
 import json
 from telethon import TelegramClient
@@ -189,7 +190,11 @@ async def scrape_group(
     include_replies: bool = False,
     user_filter: str | None = None,
 ):
-    group_safe = group.replace('/', '_')
+    s = str(group).strip()
+    s = re.sub(r'^(https?://)?(t\.me|telegram\.me|telegram\.dog)/', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^(joinchat/|\+)', '', s)
+    s = re.sub(r'^@', '', s)
+    group_safe = re.sub(r'[/\\:*?"<>|]', "_", s)
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
 

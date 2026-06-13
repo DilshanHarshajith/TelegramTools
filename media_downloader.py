@@ -328,7 +328,11 @@ def normalise_group(group_str: str):
 
 
 def safe_group_name(group_str: str) -> str:
-    return re.sub(r'[/\\:*?"<>|]', "_", str(group_str))
+    s = str(group_str).strip()
+    s = re.sub(r'^(https?://)?(t\.me|telegram\.me|telegram\.dog)/', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'^(joinchat/|\+)', '', s)
+    s = re.sub(r'^@', '', s)
+    return re.sub(r'[/\\:*?"<>|]', "_", s)
 
 
 def seed_seen_from_disk(chat_dir: str) -> set:

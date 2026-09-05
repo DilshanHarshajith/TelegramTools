@@ -283,7 +283,7 @@ async def dump_user_info(client, user_input, args, photos_dir):
             result = await client(functions.messages.GetCommonChatsRequest(
                 user_id=target_user,
                 max_id=0,
-                limit=DEFAULT_LIMIT
+                limit=_cfg.DEFAULT_LIMIT
             ))
             
             common_chats_list = []

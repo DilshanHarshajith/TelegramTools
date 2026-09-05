@@ -7,7 +7,14 @@ import asyncio
 import csv
 from telethon.tl.types import User, PeerUser
 from telethon import TelegramClient
-from telethon.errors import FloodWaitError
+from telethon.errors import (
+    FloodWaitError,
+    ChatAdminRequiredError,
+    ChannelPrivateError,
+    ChannelInvalidError,
+    UserNotParticipantError,
+    ParticipantsTooFewError,
+)
 # ---------------------------------------------------------------------------
 # Path setup — makes config.py importable from anywhere
 # ---------------------------------------------------------------------------
@@ -228,7 +235,7 @@ def get_args(parser):
         "--limit",
         type=int,
         default=0,
-        help="Maximum number of messages to scan per group (0 = all)"
+        help="Maximum number of messages/users to fetch per group (0 = all)"
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -240,6 +247,13 @@ def get_args(parser):
         type=str,
         help="Output directory (default: data/output/user_export)"
     )
+    parser.add_argument(
+        "--scan-messages",
+        action="store_true",
+        help="Force the old behavior: scan message history instead of the "
+             "participants list (default: use the participants list, falling "
+             "back to message scanning when the member list is hidden)"
+    )
 
 async def run(args):
     client = await connect_client()
@@ -247,9 +261,11 @@ async def run(args):
     os.makedirs(module_output, exist_ok=True)
 
     try:
-        # Mode: Scan messages from groups
         for group in args.groups:
-            await scan_group_messages(client, group, args, module_output)
+            if args.scan_messages:
+                await scan_group_messages(client, group, args, module_output)
+            else:
+                await export_group_users(client, group, args, module_output)
 
     except KeyboardInterrupt:
         error("\nUser interrupted, stopping...")
@@ -297,22 +313,143 @@ async def resolve_message_sender(client, msg, verbose=False):
     return None
 
 
-async def scan_group_messages(client, group, args, module_output):
-    """
-    Scan messages in a group to find unique users.
-    """
+def sanitize_group(group):
+    """Normalize a group/channel reference into a safe folder name."""
     s = str(group).strip()
     s = re.sub(r'^(https?://)?(t\.me|telegram\.me|telegram\.dog)/', '', s, flags=re.IGNORECASE)
     s = re.sub(r'^(joinchat/|\+)', '', s)
     s = re.sub(r'^@', '', s)
-    group_safe = re.sub(r'[/\\:*?"<>|]', "_", s)
+    return re.sub(r'[/\\:*?"<>|]', "_", s)
+
+
+def save_new_users_to_csv(csv_file_path, new_users, verbose=False):
+    """Append a list of Users to the CSV, writing the header only if the file is new."""
+    if not new_users:
+        return
+    info(f"Saving {len(new_users)} new users to CSV...")
+    csv_exists = os.path.isfile(csv_file_path)
+    curr_csv_exists = csv_exists
+    for sender in new_users:
+        username = getattr(sender, 'username', None) or ""
+        write_user_to_csv(
+            csv_file_path,
+            str(sender.id),
+            username,
+            sender.first_name or "",
+            sender.last_name or "",
+            curr_csv_exists
+        )
+        curr_csv_exists = True
+
+
+async def export_group_users(client, group, args, module_output):
+    """
+    Export users from a group/channel, preferring the participants list.
+
+    If the member list is visible (e.g. a channel with public members, or a
+    group you belong to), every member is exported directly. When the member
+    list is hidden/not permitted, it falls back to collecting senders by
+    scanning the message history.
+    """
+    group_safe = sanitize_group(group)
     output_dir = os.path.join(module_output, group_safe)
     os.makedirs(output_dir, exist_ok=True)
-    
     csv_file_path = os.path.join(output_dir, "visible_users.csv")
-    csv_exists = os.path.isfile(csv_file_path)
+
+    info(f"Processing group: {group}")
+
+    new_users = []
     existing_uids = read_existing_user_ids(csv_file_path)
-    
+    scanned = 0
+    limit = args.limit or None
+    used_participants = False
+
+    try:
+        async for user in tqdm_asyncio(
+            client.iter_participants(group, limit=limit),
+            desc="Exporting members",
+        ):
+            scanned += 1
+            if not isinstance(user, User):
+                continue
+            uid = str(user.id)
+            if uid in existing_uids:
+                continue
+            new_users.append(user)
+            existing_uids.add(uid)
+            if args.verbose:
+                tqdm_asyncio.write(f"{user.first_name or ''} | {uid}")
+        used_participants = True
+    except (ChatAdminRequiredError, ChannelPrivateError, ChannelInvalidError,
+            UserNotParticipantError, ParticipantsTooFewError) as e:
+        warning(f"Member list not visible for {group} ({type(e).__name__}), "
+                "falling back to scanning messages...")
+        new_users = []
+        existing_uids = read_existing_user_ids(csv_file_path)
+        scanned = 0
+        async for msg in tqdm_asyncio(
+            client.iter_messages(group, limit=limit),
+            desc="Scanning messages",
+        ):
+            scanned += 1
+            sender = await resolve_message_sender(client, msg, verbose=args.verbose)
+            if not sender:
+                continue
+            uid = str(sender.id)
+            if uid in existing_uids:
+                continue
+            new_users.append(sender)
+            existing_uids.add(uid)
+            if args.verbose:
+                tqdm_asyncio.write(f"{sender.first_name or ''} | {uid}")
+    except FloodWaitError as e:
+        warning(f"Flood wait {e.seconds}s. Waiting...")
+        await asyncio.sleep(e.seconds)
+        return await export_group_users(client, group, args, module_output)
+    except KeyboardInterrupt:
+        warning("\nCtrl+C detected, stopping...")
+    except Exception as e:
+        warning(f"Could not read member list for {group} ({type(e).__name__}), "
+                "falling back to scanning messages...")
+        new_users = []
+        existing_uids = read_existing_user_ids(csv_file_path)
+        scanned = 0
+        async for msg in tqdm_asyncio(
+            client.iter_messages(group, limit=limit),
+            desc="Scanning messages",
+        ):
+            scanned += 1
+            sender = await resolve_message_sender(client, msg, verbose=args.verbose)
+            if not sender:
+                continue
+            uid = str(sender.id)
+            if uid in existing_uids:
+                continue
+            new_users.append(sender)
+            existing_uids.add(uid)
+            if args.verbose:
+                tqdm_asyncio.write(f"{sender.first_name or ''} | {uid}")
+
+    finally:
+        save_new_users_to_csv(csv_file_path, new_users, verbose=args.verbose)
+        source = "member list" if used_participants else "message history"
+        success(f"Scanned {scanned} {source} entries, found {len(new_users)} new users")
+
+        if args.download_photos and new_users:
+            await process_photo_downloads(client, new_users, output_dir, args)
+
+
+async def scan_group_messages(client, group, args, module_output):
+    """
+    Scan messages in a group to find unique users (legacy message-only mode).
+    """
+    group_safe = sanitize_group(group)
+    output_dir = os.path.join(module_output, group_safe)
+    os.makedirs(output_dir, exist_ok=True)
+
+    csv_file_path = os.path.join(output_dir, "visible_users.csv")
+    existing_uids = read_existing_user_ids(csv_file_path)
+
     info(f"Processing group: {group}")
 
     new_users = []
@@ -322,15 +459,15 @@ async def scan_group_messages(client, group, args, module_output):
     try:
         async for msg in tqdm_asyncio(client.iter_messages(group, limit=limit), desc="Scanning messages"):
             scanned += 1
-            
+
             sender = await resolve_message_sender(client, msg, verbose=args.verbose)
             if not sender:
                 continue
-            
+
             uid = str(sender.id)
             if uid in existing_uids:
                 continue
-            
+
             new_users.append(sender)
             existing_uids.add(uid)
             if args.verbose:
@@ -340,22 +477,8 @@ async def scan_group_messages(client, group, args, module_output):
         warning("\nCtrl+C detected, stopping scanning...")
 
     finally:
-        # Save CSV
-        if new_users:
-            info(f"Saving {len(new_users)} new users to CSV...")
-            curr_csv_exists = csv_exists
-            for sender in new_users:
-                username = getattr(sender, 'username', None) or ""
-                write_user_to_csv(
-                    csv_file_path,
-                    str(sender.id),
-                    username,
-                    sender.first_name or "",
-                    sender.last_name or "",
-                    curr_csv_exists
-                )
-                curr_csv_exists = True
-        
+        save_new_users_to_csv(csv_file_path, new_users, verbose=args.verbose)
+
         success(f"Scanned {scanned} messages, found {len(new_users)} new users")
 
         if args.download_photos and new_users:
@@ -390,8 +513,9 @@ async def process_photo_downloads(client, users, output_dir, args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="Extract unique users from group message history and download profile photos.",
-        epilog="Examples:\n  python user_export.py @group\n  python user_export.py @group --no-photos --limit 500\n  python user_export.py groups.txt --out ./results",
+        description="Export users from a group/channel member list (falling back to message "
+                    "history when the member list is hidden) and download profile photos.",
+        epilog="Examples:\n  python user_export.py @group\n  python user_export.py @group --no-photos --limit 500\n  python user_export.py groups.txt --out ./results\n  python user_export.py @group --scan-messages",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     get_args(parser)

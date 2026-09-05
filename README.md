@@ -6,7 +6,7 @@ A modular toolkit for Telegram automation, data scraping, and analysis built on 
 
 - **Media Downloader** — Download photos, videos, audio, documents, voice messages, GIFs, and stickers from channels/groups. Concurrent downloads, resume support, date and type filtering.
 - **Message Scraper** — Search and export messages by keyword or sender, with optional reply context.
-- **User Export** — Extract unique users from group message history and download their profile photos.
+- **User Export** — Extract unique users from a group/channel member list (with a fallback to message history when the member list is hidden) and download their profile photos.
 - **Origin Tracer** — Trace the original source of forwarded messages, single or in bulk.
 - **Info Dumper** — Deep-dive user profile dump: status, common chats, photos (JSON output).
 - **Post Downloader** — Download profile stories/posts from a user's profile page.
@@ -111,7 +111,7 @@ python message_scraper.py --groups groups.txt --user @someone
 
 ### user_export
 
-Extract unique users from group message history and download profile photos.
+Export users from a group/channel member list (with a fallback to message history when the member list is hidden) and download profile photos.
 
 ```
 python user_export.py <groups...> [options]
@@ -119,9 +119,10 @@ python user_export.py <groups...> [options]
 groups                Group links or a file containing groups
 
   --no-photos         Skip profile photo downloads (photos downloaded by default)
-  --limit N           Max messages to scan per group (default: 0 = all)
+  --limit N           Max members/messages to fetch per group (default: 0 = all)
   -v, --verbose       Show usernames during scan
   --out DIR           Output directory
+  --scan-messages     Skip the member list and scan message history (legacy mode)
 ```
 
 **Examples:**
@@ -129,6 +130,7 @@ groups                Group links or a file containing groups
 python user_export.py @group
 python user_export.py @group --no-photos --limit 500
 python user_export.py groups.txt --out ./results
+python user_export.py @group --scan-messages
 ```
 
 ---
